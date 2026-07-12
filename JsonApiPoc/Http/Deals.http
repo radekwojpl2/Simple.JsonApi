@@ -1,0 +1,213 @@
+# Deals — /api/deals
+#
+# Run `dotnet run --project JsonApiPoc` first, then click the gutter icon next to a request.
+# `###` separates requests; the text after it is the request name. "->" notes the expected outcome.
+#
+# Seed: 1 Acme - ERP integration (proposal, contact Jan, owner Sarah)
+#       2 Globex - fleet tracking pilot (qualified)
+#       3 Initech - support renewal (won)
+#       4 Acme - hardware upgrade (lead, NO contact — the empty to-one)
+#       5 Globex - warehouse expansion (lost)
+# Stages: lead | qualified | proposal | won | lost.
+# Custom fields on deals: probability (number), competitor (text), contractSignedDate (date).
+#
+# The write endpoints take flat JSON, not JSON:API resource documents — this API is read-side
+# JSON:API only. Requests below mutate the local SQLite database.
+
+@host = http://localhost:5031
+
+### List deals
+GET {{host}}/api/deals
+Accept: application/vnd.api+json
+
+### With company, contact, and owner side-loaded (multi-include compound document)
+GET {{host}}/api/deals?include=company,contact,owner
+Accept: application/vnd.api+json
+
+### Filtered by pipeline stage
+GET {{host}}/api/deals?filter[stage]=proposal&include=company
+Accept: application/vnd.api+json
+
+### Sorted by amount, biggest first (sort composes with paging links)
+GET {{host}}/api/deals?sort=-amount
+Accept: application/vnd.api+json
+
+### Sorted by close date, then title
+GET {{host}}/api/deals?sort=closeDate,title
+Accept: application/vnd.api+json
+
+### Mixed directions: grouped by stage ascending, biggest amount first within each stage
+GET {{host}}/api/deals?sort=stage,-amount
+Accept: application/vnd.api+json
+
+### Second page of 2 -> links.prev/next, meta.total
+GET {{host}}/api/deals?page[number]=2&page[size]=2
+Accept: application/vnd.api+json
+
+### Kitchen sink: filter + include + sort + sparse fieldsets + paging in one request
+GET {{host}}/api/deals?filter[stage]=proposal&include=company,owner&sort=-amount&fields[deals]=title,amount,company,owner&fields[companies]=name&fields[users]=name&page[number]=1&page[size]=5
+Accept: application/vnd.api+json
+
+### Single deal (note customFields in attributes and links.self on every resource)
+GET {{host}}/api/deals/1?include=contact,owner
+Accept: application/vnd.api+json
+
+### Sparse fieldset on a single resource
+GET {{host}}/api/deals/1?fields[deals]=title,stage
+Accept: application/vnd.api+json
+
+### Missing deal -> 404
+GET {{host}}/api/deals/999
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Following the hypermedia links. Each relationship carries links.self (the
+# linkage) and links.related (the full related resource).
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Related resource: a deal's company (links.related)
+GET {{host}}/api/deals/1/company
+Accept: application/vnd.api+json
+
+### Relationship linkage: just the resource identifier (links.self)
+GET {{host}}/api/deals/1/relationships/company
+Accept: application/vnd.api+json
+
+### A deal's contact
+GET {{host}}/api/deals/1/contact
+Accept: application/vnd.api+json
+
+### A deal's contact linkage
+GET {{host}}/api/deals/1/relationships/contact
+Accept: application/vnd.api+json
+
+### A deal's owner, trimmed with a sparse fieldset
+GET {{host}}/api/deals/1/owner?fields[users]=name
+Accept: application/vnd.api+json
+
+### A deal's owner linkage
+GET {{host}}/api/deals/1/relationships/owner
+Accept: application/vnd.api+json
+
+### Empty to-one related resource -> 200 with data: null (deal 4 has no contact; not a 404)
+GET {{host}}/api/deals/4/contact
+Accept: application/vnd.api+json
+
+### Empty to-one linkage -> 200 with data: null
+GET {{host}}/api/deals/4/relationships/contact
+Accept: application/vnd.api+json
+
+### Relationship on a missing parent -> 404
+GET {{host}}/api/deals/999/relationships/company
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Query validation -> 400 problem details
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Unsupported include path -> 400
+GET {{host}}/api/deals?include=invoices
+Accept: application/vnd.api+json
+
+### Unknown stage filter -> 400 (allowed values listed in detail)
+GET {{host}}/api/deals?filter[stage]=bogus
+Accept: application/vnd.api+json
+
+### Undeclared filter name -> 400
+GET {{host}}/api/deals?filter[amount]=48000
+Accept: application/vnd.api+json
+
+### Unsupported sort field -> 400
+GET {{host}}/api/deals?sort=height
+Accept: application/vnd.api+json
+
+### Unknown query parameter -> 400 (strict validation)
+GET {{host}}/api/deals?foo=bar
+Accept: application/vnd.api+json
+
+### Paging a single-resource endpoint -> 400 (only collections paginate)
+GET {{host}}/api/deals/1?page[number]=2
+Accept: application/vnd.api+json
+
+### Unknown field in a sparse fieldset -> 400
+GET {{host}}/api/deals?fields[deals]=nonexistent
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Writes: flat JSON bodies (deliberately not JSON:API documents)
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Create a deal with custom fields -> 201 + Location + the created resource document
+POST {{host}}/api/deals
+Content-Type: application/json
+
+{
+  "title": "Globex - warehouse automation",
+  "amount": 95000,
+  "stage": "qualified",
+  "closeDate": "2026-11-30T00:00:00Z",
+  "companyId": 2,
+  "contactId": 3,
+  "ownerId": 2,
+  "customFields": {
+    "probability": 40,
+    "competitor": "Siemens"
+  }
+}
+
+### Unknown stage -> 422
+POST {{host}}/api/deals
+Content-Type: application/json
+
+{ "title": "Bad stage", "stage": "bogus", "companyId": 1, "ownerId": 1 }
+
+### Unknown custom field -> 422
+POST {{host}}/api/deals
+Content-Type: application/json
+
+{
+  "title": "Bad deal",
+  "companyId": 1,
+  "ownerId": 1,
+  "customFields": { "nonexistent": 1 }
+}
+
+### Referencing a missing company -> 422
+POST {{host}}/api/deals
+Content-Type: application/json
+
+{ "title": "Orphan deal", "companyId": 999, "ownerId": 1 }
+
+### Update partially -> 204, no body; omitted fields keep their value, customFields merge
+PATCH {{host}}/api/deals/1
+Content-Type: application/json
+
+{
+  "stage": "won",
+  "amount": 120000,
+  "customFields": { "probability": 100 }
+}
+
+### Re-point a deal's contact via flat PATCH (this API's substitute for relationship writes)
+PATCH {{host}}/api/deals/1
+Content-Type: application/json
+
+{ "contactId": 2 }
+
+### Update with an unknown stage -> 422
+PATCH {{host}}/api/deals/1
+Content-Type: application/json
+
+{ "stage": "bogus" }
+
+### Update a missing deal -> 404
+PATCH {{host}}/api/deals/999
+Content-Type: application/json
+
+{ "title": "Ghost" }
+
+### Delete a deal (its custom field values go with it) -> 204
+DELETE {{host}}/api/deals/5
+
+### Delete a missing deal -> 404
+DELETE {{host}}/api/deals/999

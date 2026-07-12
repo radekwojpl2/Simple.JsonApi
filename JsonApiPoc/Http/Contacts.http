@@ -1,0 +1,180 @@
+# Contacts — /api/contacts
+#
+# Run `dotnet run --project JsonApiPoc` first, then click the gutter icon next to a request.
+# `###` separates requests; the text after it is the request name. "->" notes the expected outcome.
+#
+# Seed: 1 Jan Kowalski (Acme), 2 Maria Nowak (Acme), 3 Piotr Wisniewski (Globex),
+#       4 Anna Zielinska (Initech), 5 Adam Kowalski (Initech).
+# Custom fields on contacts: leadSource (text), newsletterOptIn (boolean).
+#
+# The write endpoints take flat JSON, not JSON:API resource documents — this API is read-side
+# JSON:API only. Requests below mutate the local SQLite database.
+
+@host = http://localhost:5031
+
+### List contacts
+GET {{host}}/api/contacts
+Accept: application/vnd.api+json
+
+### With their company side-loaded (compound document: data + included)
+GET {{host}}/api/contacts?include=company
+Accept: application/vnd.api+json
+
+### Sorted by last name, then first name (two Kowalskis in the seed -> Adam before Jan)
+GET {{host}}/api/contacts?sort=lastName,firstName
+Accept: application/vnd.api+json
+
+### Mixed directions: last name ascending, tie broken by first name DESCENDING (-> Jan before Adam)
+GET {{host}}/api/contacts?sort=lastName,-firstName
+Accept: application/vnd.api+json
+
+### Second page of 2 -> links.prev/next, meta.total
+GET {{host}}/api/contacts?page[number]=2&page[size]=2
+Accept: application/vnd.api+json
+
+### Page past the end -> 200 with empty data; links.last shows the real last page
+GET {{host}}/api/contacts?page[number]=99
+Accept: application/vnd.api+json
+
+### Sparse fieldsets across both types: names only, and only the company's name
+GET {{host}}/api/contacts?include=company&fields[contacts]=firstName,lastName,company&fields[companies]=name
+Accept: application/vnd.api+json
+
+### Single contact (note customFields in attributes and links.self on every resource)
+GET {{host}}/api/contacts/2
+Accept: application/vnd.api+json
+
+### Single contact with its company side-loaded
+GET {{host}}/api/contacts/1?include=company
+Accept: application/vnd.api+json
+
+### Missing contact -> 404
+GET {{host}}/api/contacts/999
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Following the hypermedia links on relationships.company
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Related resource: the contact's company (links.related) -> the full company resource
+GET {{host}}/api/contacts/2/company
+Accept: application/vnd.api+json
+
+### Relationship linkage: just the identifier (links.self) -> { "type": "companies", "id": "1" }
+GET {{host}}/api/contacts/1/relationships/company
+Accept: application/vnd.api+json
+
+### The related company, trimmed with a sparse fieldset
+GET {{host}}/api/contacts/1/company?fields[companies]=name
+Accept: application/vnd.api+json
+
+### Relationship on a missing parent -> 404
+GET {{host}}/api/contacts/999/relationships/company
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Query validation -> 400 problem details
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Unsupported sort field -> 400 (detail lists lastName, firstName, email)
+GET {{host}}/api/contacts?sort=height
+Accept: application/vnd.api+json
+
+### Unsupported include path -> 400
+GET {{host}}/api/contacts?include=deals
+Accept: application/vnd.api+json
+
+### Unknown query parameter -> 400 (strict validation)
+GET {{host}}/api/contacts?foo=bar
+Accept: application/vnd.api+json
+
+### Bare page parameter -> 400 (the page family is reserved by the spec)
+GET {{host}}/api/contacts?page=2
+Accept: application/vnd.api+json
+
+### Unsupported page parameter -> 400
+GET {{host}}/api/contacts?page[offset]=10
+Accept: application/vnd.api+json
+
+### Invalid page size -> 400
+GET {{host}}/api/contacts?page[size]=0
+Accept: application/vnd.api+json
+
+### Unknown field in a sparse fieldset -> 400
+GET {{host}}/api/contacts?fields[contacts]=nonexistent
+Accept: application/vnd.api+json
+
+### Unknown resource type in a sparse fieldset -> 400
+GET {{host}}/api/contacts?fields[gadgets]=name
+Accept: application/vnd.api+json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Writes: flat JSON bodies (deliberately not JSON:API documents)
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Create a contact with custom fields -> 201 + Location + the created resource document
+POST {{host}}/api/contacts
+Content-Type: application/json
+
+{
+  "firstName": "Tomasz",
+  "lastName": "Mazur",
+  "email": "tomasz@initech.example.com",
+  "phone": "+48 500 200 100",
+  "companyId": 3,
+  "customFields": {
+    "leadSource": "conference",
+    "newsletterOptIn": false
+  }
+}
+
+### Missing required field -> 422
+POST {{host}}/api/contacts
+Content-Type: application/json
+
+{ "firstName": "NoLastName", "companyId": 1 }
+
+### Unknown custom field -> 422
+POST {{host}}/api/contacts
+Content-Type: application/json
+
+{
+  "firstName": "Bad",
+  "lastName": "Field",
+  "email": "bad@example.com",
+  "companyId": 1,
+  "customFields": { "nonexistent": 1 }
+}
+
+### Referencing a missing company -> 422
+POST {{host}}/api/contacts
+Content-Type: application/json
+
+{ "firstName": "Orphan", "lastName": "Contact", "email": "orphan@example.com", "companyId": 999 }
+
+### Update partially -> 204, no body; omitted fields keep their value, customFields merge
+PATCH {{host}}/api/contacts/1
+Content-Type: application/json
+
+{
+  "email": "updated@example.com",
+  "customFields": { "newsletterOptIn": true }
+}
+
+### Move a contact to another company via flat PATCH (this API's substitute for relationship writes)
+PATCH {{host}}/api/contacts/1
+Content-Type: application/json
+
+{ "companyId": 2 }
+
+### Update a missing contact -> 404
+PATCH {{host}}/api/contacts/999
+Content-Type: application/json
+
+{ "firstName": "Ghost" }
+
+### Delete a contact (deals/activities referencing it get their contact set to null) -> 204
+DELETE {{host}}/api/contacts/5
+
+### Delete a missing contact -> 404
+DELETE {{host}}/api/contacts/999

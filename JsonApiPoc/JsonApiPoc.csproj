@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\JsonApiPoc.Application\JsonApiPoc.Application.csproj" />
+      <ProjectReference Include="..\libs\JsonApiKit\JsonApiKit.csproj" />
+      <ProjectReference Include="..\libs\JsonApiKit.OpenApi\JsonApiKit.OpenApi.csproj" />
+    </ItemGroup>
+
+</Project>
