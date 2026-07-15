@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- The bare JsonApiKit id is taken on nuget.org, so packages ship as Simple.JsonApi.*;
+         assembly and namespace names stay JsonApiKit. -->
+    <PackageId>Simple.JsonApi.OpenApi</PackageId>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
