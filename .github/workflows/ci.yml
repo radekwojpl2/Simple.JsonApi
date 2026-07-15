@@ -41,7 +41,9 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     permissions:
+      contents: read # a job-level permissions block drops everything unlisted, checkout included
       id-token: write # enable GitHub OIDC token issuance for NuGet Trusted Publishing
+      pull-requests: write # comment the published preview version on the PR
 
     steps:
       - uses: actions/checkout@v4
@@ -92,3 +94,30 @@ jobs:
             --api-key ${{ steps.login.outputs.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
+
+      # One sticky comment per PR: the first publish creates it, later publishes update it
+      # in place (found via the marker) instead of piling up a comment per push.
+      - name: Comment published version on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          MARKER="<!-- preview-packages -->"
+          BODY=$(printf '%s\n' \
+            "$MARKER" \
+            "📦 Preview packages published to nuget.org as **$VERSION**:" \
+            "" \
+            '```' \
+            "dotnet add package Simple.JsonApi --version $VERSION" \
+            "dotnet add package Simple.JsonApi.OpenApi --version $VERSION" \
+            "dotnet add package Simple.JsonApi.Testing --version $VERSION" \
+            '```' \
+            "" \
+            "_Packages can take a few minutes to appear while nuget.org validates and indexes them._")
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$COMMENT_ID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -f body="$BODY"
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" -f body="$BODY"
+          fi
