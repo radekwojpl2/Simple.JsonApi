@@ -26,6 +26,24 @@ public class ContentNegotiationSpecComplianceTests(ApiFactory factory) : ApiTest
         Assert.Equal(JsonApiMediaTypes.JsonApi, response.Content.Headers.ContentType?.MediaType);
     }
 
+    /// <summary>"Clients and servers MUST send all JSON:API payloads using the JSON:API media type
+    /// (application/vnd.api+json) in the Content-Type header." — this server enforces the client
+    /// half by refusing any other body media type with 415, since it serves no other contract.</summary>
+    [Fact]
+    public async Task NonJsonApiContentType_Returns415()
+    {
+        // Arrange — a payload declared as plain JSON.
+        using var request = new HttpRequestMessage(HttpMethod.Post, Routes.Deals);
+        request.Content = new StringContent("{}");
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+        // Act
+        var response = await Client.SendAsync(request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+    }
+
     /// <summary>"If a request specifies the Content-Type header with the JSON:API media type,
     /// servers MUST respond with a 415 Unsupported Media Type status code if that media type
     /// contains any media type parameters other than ext or profile."</summary>

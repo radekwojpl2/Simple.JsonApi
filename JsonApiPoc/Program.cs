@@ -12,7 +12,10 @@ using JsonApiPoc.JsonApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi(o => o.AddJsonApiQueryParameters().AddJsonApiLinkageBodies());
+builder.Services.AddOpenApi(o => o
+    .AddJsonApiQueryParameters()
+    .AddJsonApiLinkageBodies()
+    .AddJsonApiResourceDocumentBodies());
 builder.Services.AddProblemDetails();
 builder.Services.AddApplication(builder.Configuration.GetConnectionString("Default")!);
 builder.Services.AddJsonApi(o => o

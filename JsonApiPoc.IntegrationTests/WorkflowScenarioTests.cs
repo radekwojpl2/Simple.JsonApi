@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using JsonApiPoc.Domain;
 
@@ -25,15 +24,16 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
         // Step 1 — a new prospect calls in: contact first, then a deal attached to them.
         var beata = await PostContactAsync("Beata", "Sowa", "beata.sowa@acme.example.com", company.Id);
 
-        var dealResponse = await Client.PostAsJsonAsync(Routes.Deals, new
-        {
-            title = "Conveyor retrofit",
-            amount = 20000,
-            companyId = company.Id,
-            contactId = beata.Id,
-            ownerId = owner.Id,
-            customFields = new { probability = 10 }
-        });
+        var dealResponse = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Conveyor retrofit",
+                amount = 20000,
+                customFields = new { probability = 10 }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Contact, ResourceTypes.Contacts, beata.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
         Assert.Equal(HttpStatusCode.Created, dealResponse.StatusCode);
         var dealLocation = dealResponse.Headers.Location!.ToString();
         var dealBody = JsonNode.Parse(await dealResponse.Content.ReadAsStringAsync())!;
@@ -49,8 +49,8 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
         // Step 2 — work the deal through the pipeline; each transition bumps the win probability.
         foreach (var (stage, probability) in new[] { ("qualified", 30), ("proposal", 60), ("won", 100) })
         {
-            var patched = await Client.PatchAsJsonAsync(dealLocation,
-                new { stage, customFields = new { probability } });
+            var patched = await Client.PatchJsonApiAsync(dealLocation,
+                Document.Patch(ResourceTypes.Deals, deal.Id, new { stage, customFields = new { probability } }));
             Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
 
             deal.Stage = stage;
@@ -75,7 +75,9 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
 
         // Step 5 — account handoff: the deal moves to a different contact; the linkage must follow.
         var igor = await PostContactAsync("Igor", "Baran", "igor.baran@acme.example.com", company.Id);
-        await Client.PatchAsJsonAsync(dealLocation, new { contactId = igor.Id });
+        await Client.PatchJsonApiAsync(dealLocation,
+            Document.Patch(ResourceTypes.Deals, deal.Id, attributes: null,
+                (Rel.Contact, ResourceTypes.Contacts, igor.Id)));
 
         var reassigned = await Client.GetDocumentAsync($"{dealLocation}/relationships/contact");
         reassigned.ShouldMatchExactly(Document.Linkage(
@@ -123,14 +125,15 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
             return (globex, marcus, alreadyLost);
         });
 
-        var created = await Client.PostAsJsonAsync(Routes.Deals, new
-        {
-            title = "Cold chain monitoring",
-            amount = 18000,
-            companyId = company.Id,
-            ownerId = owner.Id,
-            customFields = new { probability = 55 }
-        });
+        var created = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Cold chain monitoring",
+                amount = 18000,
+                customFields = new { probability = 55 }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
         var location = created.Headers.Location!.ToString();
         var coldChain = new Deal
         {
@@ -141,11 +144,12 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
         };
 
         // Step 1 — the deal falls through: mark it lost and record who won it instead.
-        var patched = await Client.PatchAsJsonAsync(location, new
-        {
-            stage = "lost",
-            customFields = new { probability = 0, competitor = "ColdTrack" }
-        });
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Deals, coldChain.Id, new
+            {
+                stage = "lost",
+                customFields = new { probability = 0, competitor = "ColdTrack" }
+            }));
         Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
 
         var lost = await Client.GetDocumentAsync(location);
@@ -200,13 +204,14 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
             return db.Companies.Add(Rows.Company()).Entity;
         });
 
-        var created = await Client.PostAsJsonAsync(Routes.Contacts, new
-        {
-            firstName = "Rafal",
-            lastName = "Gajda",
-            companyId = company.Id,
-            customFields = new { leadSource = "webinar" }
-        });
+        var created = await Client.PostJsonApiAsync(Routes.Contacts, Document.Post(ResourceTypes.Contacts,
+            new
+            {
+                firstName = "Rafal",
+                lastName = "Gajda",
+                customFields = new { leadSource = "webinar" }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id)));
         var location = created.Headers.Location!.ToString();
         var rafal = new Contact
         {
@@ -216,13 +221,15 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
         };
 
         // Act + Assert — patching a different custom field must add it without touching the existing one...
-        await Client.PatchAsJsonAsync(location, new { customFields = new { newsletterOptIn = true } });
+        await Client.PatchJsonApiAsync(location, Document.Patch(ResourceTypes.Contacts, rafal.Id,
+            new { customFields = new { newsletterOptIn = true } }));
         var afterAdd = await Client.GetDocumentAsync(location);
         afterAdd.ShouldMatchExactly(Document.Single(
             Document.Contact(rafal, new { leadSource = "webinar", newsletterOptIn = true })));
 
         // Act + Assert — ...and patching the original field must update it while keeping the added one.
-        await Client.PatchAsJsonAsync(location, new { customFields = new { leadSource = "referral" } });
+        await Client.PatchJsonApiAsync(location, Document.Patch(ResourceTypes.Contacts, rafal.Id,
+            new { customFields = new { leadSource = "referral" } }));
         var afterUpdate = await Client.GetDocumentAsync(location);
         afterUpdate.ShouldMatchExactly(Document.Single(
             Document.Contact(rafal, new { leadSource = "referral", newsletterOptIn = true })));
@@ -303,14 +310,13 @@ public class WorkflowScenarioTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(allIds, visited.ToHashSet());
     }
 
-    /// <summary>POSTs a contact and returns an entity mirroring what the server stored, for
-    /// building expected documents. Unsent email/phone are stored as empty strings.</summary>
+    /// <summary>POSTs a contact resource document and returns an entity mirroring what the server
+    /// stored, for building expected documents. Unsent email/phone are stored as empty strings.</summary>
     private async Task<Contact> PostContactAsync(string firstName, string lastName, string email, int companyId)
     {
-        var response = await Client.PostAsJsonAsync(Routes.Contacts, new
-        {
-            firstName, lastName, email, companyId
-        });
+        var response = await Client.PostJsonApiAsync(Routes.Contacts, Document.Post(ResourceTypes.Contacts,
+            new { firstName, lastName, email },
+            (Rel.Company, ResourceTypes.Companies, companyId)));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
         return new Contact

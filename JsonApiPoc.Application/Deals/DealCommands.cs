@@ -17,7 +17,9 @@ public sealed record CreateDealCommand(
     int OwnerId,
     Dictionary<string, JsonElement>? CustomFields) : IRequest<CommandResult<DealResult>>;
 
-/// <summary>Partial update: null fields keep their current value; custom fields are merged into the existing set.</summary>
+/// <summary>Partial update: null fields keep their current value; custom fields are merged into
+/// the existing set. ClearContact severs the deal→contact link (a null ContactId alone means
+/// "keep") and wins over ContactId.</summary>
 public sealed record UpdateDealCommand(
     int Id,
     string? Title,
@@ -27,7 +29,8 @@ public sealed record UpdateDealCommand(
     int? CompanyId,
     int? ContactId,
     int? OwnerId,
-    Dictionary<string, JsonElement>? CustomFields) : IRequest<CommandResult<DealResult>>;
+    Dictionary<string, JsonElement>? CustomFields,
+    bool ClearContact = false) : IRequest<CommandResult<DealResult>>;
 
 public sealed record DeleteDealCommand(int Id) : IRequest<bool>;
 
@@ -137,7 +140,14 @@ public sealed class UpdateDealHandler(AppDbContext db) : IRequestHandler<UpdateD
         deal.Stage = request.Stage ?? deal.Stage;
         deal.CloseDate = request.CloseDate ?? deal.CloseDate;
         deal.CompanyId = request.CompanyId ?? deal.CompanyId;
-        deal.ContactId = request.ContactId ?? deal.ContactId;
+        if (request.ClearContact)
+        {
+            deal.ContactId = null;
+        }
+        else
+        {
+            deal.ContactId = request.ContactId ?? deal.ContactId;
+        }
         deal.OwnerId = request.OwnerId ?? deal.OwnerId;
 
         await Data.CustomFields.UpsertAsync(db, "deals", deal.Id, convertedFields, cancellationToken);

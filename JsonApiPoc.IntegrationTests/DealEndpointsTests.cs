@@ -377,14 +377,15 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         });
 
         // Act
-        var created = await Client.PostAsJsonAsync(Routes.Deals, new
-        {
-            title = "Warehouse automation",
-            amount = 75000,
-            companyId = company.Id,
-            ownerId = owner.Id,
-            customFields = new { probability = 40, contractSignedDate = "2026-10-01" }
-        });
+        var created = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Warehouse automation",
+                amount = 75000,
+                customFields = new { probability = 40, contractSignedDate = "2026-10-01" }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
 
         // Assert — 201 with Location, and the body is the complete created resource: stage
         // defaults to lead, no closeDate, no contact relationship, typed custom fields.
@@ -409,14 +410,72 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task Post_JsonApiResourceDocument_CreatesDeal()
+    {
+        // Arrange — the related rows and the custom field the document sets.
+        var (company, contact, owner) = await ArrangeAsync(db =>
+        {
+            db.CustomFieldDefinitions.Add(Rows.Field(ResourceTypes.Deals, Attr.Probability, dataType: "number"));
+            var company = Rows.Company();
+            return (db.Companies.Add(company).Entity,
+                db.Contacts.Add(Rows.Contact("Jan", "Kowalski", company)).Entity,
+                db.Users.Add(Rows.User()).Entity);
+        });
+
+        // Act — a create with every attribute and relationship the document can carry.
+        var created = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Warehouse automation",
+                amount = 75000,
+                stage = "qualified",
+                customFields = new { probability = 40 }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Contact, ResourceTypes.Contacts, contact.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
+
+        // Assert — 201 with Location and the full created resource.
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var location = created.Headers.Location!.ToString();
+        var body = JsonNode.Parse(await created.Content.ReadAsStringAsync())!;
+        var id = int.Parse(body[Doc.Data]![Doc.Id]!.GetValue<string>());
+        Assert.Equal($"{Routes.Deals}/{id}", location);
+
+        var expected = new Deal
+        {
+            Id = id, Title = "Warehouse automation", Amount = 75000m, Stage = "qualified",
+            CompanyId = company.Id, ContactId = contact.Id, OwnerId = owner.Id
+        };
+        body.ShouldMatchExactly(Document.Single(Document.Deal(expected, new { probability = 40 })));
+    }
+
+    [Fact]
     public async Task Post_MissingTitle_Returns422()
     {
-        // Act
-        var response = await Client.PostAsJsonAsync(Routes.Deals, new { companyId = 1, ownerId = 1 });
+        // Act — relationships are present, but the title attribute is not.
+        var response = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            attributes: null,
+            (Rel.Company, ResourceTypes.Companies, 1),
+            (Rel.Owner, ResourceTypes.Users, 1)));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
         problem.ShouldMatchExactly(Document.Problem(422, "Validation failed", "The 'title' field is required."));
+    }
+
+    /// <summary>The API's only write contract is JSON:API; a flat application/json body is
+    /// refused up front by the content negotiation middleware.</summary>
+    [Fact]
+    public async Task Post_FlatJsonContentType_Returns415()
+    {
+        // Act
+        var response = await Client.PostAsJsonAsync(Routes.Deals, new { title = "Flat JSON" });
+
+        // Assert
+        var problem = await response.ReadProblemAsync(415);
+        problem.ShouldMatchExactly(Document.Problem(415, "Unsupported media type",
+            "This API accepts only JSON:API request bodies; send the payload as 'application/vnd.api+json'."));
     }
 
     [Fact]
@@ -430,13 +489,14 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         });
 
         // Act
-        var response = await Client.PostAsJsonAsync(Routes.Deals, new
-        {
-            title = "Mistyped probability",
-            companyId = company.Id,
-            ownerId = owner.Id,
-            customFields = new { probability = "high" } // declared as a number field
-        });
+        var response = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Mistyped probability",
+                customFields = new { probability = "high" } // declared as a number field
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
@@ -455,13 +515,14 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         });
 
         // Act
-        var response = await Client.PostAsJsonAsync(Routes.Deals, new
-        {
-            title = "Mistyped signature date",
-            companyId = company.Id,
-            ownerId = owner.Id,
-            customFields = new { contractSignedDate = "not-a-date" }
-        });
+        var response = await Client.PostJsonApiAsync(Routes.Deals, Document.Post(ResourceTypes.Deals,
+            new
+            {
+                title = "Mistyped signature date",
+                customFields = new { contractSignedDate = "not-a-date" }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id),
+            (Rel.Owner, ResourceTypes.Users, owner.Id)));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
@@ -478,12 +539,62 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var location = $"{Routes.Deals}/{deal.Id}";
 
         // Act
-        var patched = await Client.PatchAsJsonAsync(location, new { stage = "qualified", amount = 15000 });
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Deals, deal.Id, new { stage = "qualified", amount = 15000 }));
 
         // Assert — the reloaded document is the full resource with only the patched fields changed.
         Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
         deal.Stage = "qualified";
         deal.Amount = 15000m;
+        var reloaded = await Client.GetDocumentAsync(location);
+        reloaded.ShouldMatchExactly(Document.Single(Document.Deal(deal)));
+    }
+
+    [Fact]
+    public async Task Patch_JsonApiResourceDocument_UpdatesAttributesAndRelationships()
+    {
+        // Arrange — a deal without a contact, plus the contact the patch links.
+        var (deal, contact) = await ArrangeAsync(db =>
+        {
+            var company = Rows.Company();
+            return (db.Deals.Add(Rows.Deal("Migration project", company, Rows.User())).Entity,
+                db.Contacts.Add(Rows.Contact("Jan", "Kowalski", company)).Entity);
+        });
+        var location = $"{Routes.Deals}/{deal.Id}";
+
+        // Act — one attribute and one relationship; everything else keeps its value.
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Deals, deal.Id, new { stage = "qualified" },
+                (Rel.Contact, ResourceTypes.Contacts, contact.Id)));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
+        deal.Stage = "qualified";
+        deal.ContactId = contact.Id;
+        var reloaded = await Client.GetDocumentAsync(location);
+        reloaded.ShouldMatchExactly(Document.Single(Document.Deal(deal)));
+    }
+
+    [Fact]
+    public async Task Patch_JsonApiNullContactLinkage_ClearsContact()
+    {
+        // Arrange — a deal that has a contact.
+        var deal = await ArrangeAsync(db =>
+        {
+            var company = Rows.Company();
+            return db.Deals.Add(Rows.Deal("Losing its contact", company, Rows.User(),
+                contact: Rows.Contact("Jan", "Kowalski", company))).Entity;
+        });
+        var location = $"{Routes.Deals}/{deal.Id}";
+
+        // Act — a null target id emits the clearing "data": null linkage.
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Deals, deal.Id, attributes: null,
+                (Rel.Contact, ResourceTypes.Contacts, null)));
+
+        // Assert — the contact relationship is gone from the resource document.
+        Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
+        deal.ContactId = null;
         var reloaded = await Client.GetDocumentAsync(location);
         reloaded.ShouldMatchExactly(Document.Single(Document.Deal(deal)));
     }
@@ -499,7 +610,9 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
             db.Deals.Add(Rows.Deal("Repointing at nothing", Rows.Company(), Rows.User())).Entity);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/{deal.Id}", new { companyId = 99999 });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/{deal.Id}",
+            Document.Patch(ResourceTypes.Deals, deal.Id, attributes: null,
+                (Rel.Company, ResourceTypes.Companies, 99999)));
 
         // Assert
         var problem = await response.ReadProblemAsync(404);
@@ -510,7 +623,8 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task Patch_UnknownId_Returns404()
     {
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/99999", new { stage = "won" });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/99999",
+            Document.Patch(ResourceTypes.Deals, 99999, new { stage = "won" }));
 
         // Assert
         var problem = await response.ReadProblemAsync(404);
@@ -542,14 +656,14 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var relatedUrl = $"{Routes.Deals}/{deal.Id}/contact";
 
         // Act + Assert — set: the linkage endpoint reports the new identifier.
-        var set = await Client.PatchAsJsonAsync(linkageUrl,
-            new { data = new { type = ResourceTypes.Contacts, id = contact.Id.ToString() } });
+        var set = await Client.PatchJsonApiAsync(linkageUrl,
+            Document.Linkage((ResourceTypes.Contacts, contact.Id)));
         Assert.Equal(HttpStatusCode.NoContent, set.StatusCode);
         var linkage = await Client.GetDocumentAsync(linkageUrl);
         linkage.ShouldMatchExactly(Document.Linkage(linkageUrl, relatedUrl, (ResourceTypes.Contacts, contact.Id)));
 
         // Act + Assert — clear: back to explicit null linkage.
-        var cleared = await Client.PatchAsJsonAsync(linkageUrl, new { data = (object?)null });
+        var cleared = await Client.PatchJsonApiAsync(linkageUrl, Document.Linkage(null));
         Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
         var emptied = await Client.GetDocumentAsync(linkageUrl);
         emptied.ShouldMatchExactly(Document.Linkage(linkageUrl, relatedUrl, identifier: null));
@@ -562,8 +676,8 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var deal = await ArrangeAsync(DealWithoutContact);
 
         // Act — a users identifier where the relationship holds contacts.
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
-            new { data = new { type = ResourceTypes.Users, id = "1" } });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
+            Document.Linkage((ResourceTypes.Users, 1)));
 
         // Assert
         var problem = await response.ReadProblemAsync(409);
@@ -578,8 +692,8 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var deal = await ArrangeAsync(DealWithoutContact);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
-            new { data = new { type = ResourceTypes.Contacts, id = "99999" } });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
+            Document.Linkage((ResourceTypes.Contacts, 99999)));
 
         // Assert
         var problem = await response.ReadProblemAsync(404);
@@ -593,7 +707,7 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var deal = await ArrangeAsync(DealWithoutContact);
 
         // Act — not a linkage document at all.
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/{deal.Id}/relationships/contact",
             new { contactId = 5 });
 
         // Assert
@@ -611,8 +725,8 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var deal = await ArrangeAsync(DealWithoutContact);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Deals}/{deal.Id}/relationships/company",
-            new { data = (object?)null });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Deals}/{deal.Id}/relationships/company",
+            Document.Linkage(null));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
@@ -630,8 +744,8 @@ public class DealEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var linkageUrl = $"{Routes.Deals}/{deal.Id}/relationships/owner";
 
         // Act
-        var response = await Client.PatchAsJsonAsync(linkageUrl,
-            new { data = new { type = ResourceTypes.Users, id = newOwner.Id.ToString() } });
+        var response = await Client.PatchJsonApiAsync(linkageUrl,
+            Document.Linkage((ResourceTypes.Users, newOwner.Id)));
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);

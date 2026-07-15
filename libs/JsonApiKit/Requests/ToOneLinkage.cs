@@ -19,12 +19,12 @@ public sealed record ToOneLinkageBodyMetadata(string TargetType, bool Clearable)
 public static class ToOneLinkageEndpointExtensions
 {
     /// <summary>Declares the endpoint's request body as a to-one linkage document targeting
-    /// <paramref name="targetType"/>: sets the accepted content types (JSON:API plus plain JSON)
-    /// and the metadata JsonApiKit.OpenApi turns into a schema example.</summary>
+    /// <paramref name="targetType"/>: sets the accepted content type (JSON:API only) and the
+    /// metadata JsonApiKit.OpenApi turns into a schema example.</summary>
     public static RouteHandlerBuilder WithToOneLinkageBody(this RouteHandlerBuilder builder,
         string targetType, bool clearable) =>
         builder
-            .Accepts<ToOneLinkageDocument>(JsonApiResults.MediaType, "application/json")
+            .Accepts<ToOneLinkageDocument>(JsonApiResults.MediaType)
             .WithMetadata(new ToOneLinkageBodyMetadata(targetType, clearable));
 }
 

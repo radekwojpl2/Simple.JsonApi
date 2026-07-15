@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Test-client helpers for JSON:API (https://jsonapi.org/format/) HTTP APIs: document member-name constants, media types, and HttpClient extensions for fetching and navigating JSON:API documents in integration tests. Framework-agnostic — works against any JSON:API server.</Description>
+    <Description>Test-client helpers for JSON:API (https://jsonapi.org/format/) HTTP APIs: document member-name constants, media types, HttpClient extensions, request-body and golden-model document builders, and subset/exact JSON matching for integration tests. Framework-agnostic — works against any JSON:API server.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

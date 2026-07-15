@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json.Nodes;
 using JsonApiKit;
 using JsonApiPoc.Application.Contacts;
 using JsonApiPoc.Domain;
@@ -6,30 +6,20 @@ using MediatR;
 
 namespace JsonApiPoc.Endpoints.Contacts;
 
+// Request body for POST /api/contacts — a JSON:API resource document (application/vnd.api+json is
+// the only accepted content type): firstName, lastName, email, phone and customFields as
+// attributes; company as a to-one relationship.
 public static class CreateContact
 {
     public static void Map(RouteGroupBuilder contacts) =>
-        contacts.MapPost("/", async (ISender sender, ResourceMapRegistry maps,
-            CreateContactRequest request) =>
+        contacts.MapPost("/", async (ISender sender, ResourceMapRegistry maps, JsonNode? body) =>
         {
-            if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            if (ContactDocuments.TryReadCreateCommand(body, out var command) is { } invalid)
             {
-                return JsonApiResults.Validation("The 'firstName' and 'lastName' fields are required.");
+                return invalid;
             }
 
-            if (request.CompanyId is not { } companyId)
-            {
-                return JsonApiResults.Validation("The 'companyId' field is required.");
-            }
-
-            var result = await sender.Send(new CreateContactCommand(
-                request.FirstName,
-                request.LastName,
-                request.Email ?? "",
-                request.Phone ?? "",
-                companyId,
-                request.CustomFields));
-
+            var result = await sender.Send(command!);
             if (result.Error is { } error)
             {
                 return JsonApiResults.Error(new JsonApiError { StatusCode = error.Status, Title = error.Title, Detail = error.Detail });
@@ -42,15 +32,13 @@ public static class CreateContact
             };
             return JsonApiResults.Created($"/api/contacts/{created.Contact.Id}", document);
         })
-        .WithSummary("Create a contact from a flat JSON object; customFields is validated against the contact field definitions. Returns 201 with a Location header and the created resource as a JSON:API document.")
-        .Accepts<CreateContactRequest>("application/json")
+        .WithSummary("Create a contact from a JSON:API resource document; the customFields attribute is validated against the contact field definitions. Returns 201 with a Location header and the created resource as a JSON:API document.")
+        .WithResourceDocumentBody<ContactDocuments.ContactAttributes>("contacts", update: false,
+            new ResourceDocumentRelationshipMetadata("company", "companies", Required: true, Clearable: false))
         .Produces<JsonApiDocument>(201, contentType: JsonApiResults.MediaType)
         .ProducesProblem(400)
+        .ProducesProblem(403)
         .ProducesProblem(404)
+        .ProducesProblem(409)
         .ProducesProblem(422);
 }
-
-// Request body for POST /api/contacts:
-// { "firstName": "...", "lastName": "...", "email": "...", "phone": "...", "companyId": 1, "customFields": { "leadSource": "referral" } }
-public record CreateContactRequest(string? FirstName, string? LastName, string? Email, string? Phone,
-    int? CompanyId, Dictionary<string, JsonElement>? CustomFields);

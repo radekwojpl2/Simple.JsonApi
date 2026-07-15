@@ -11,8 +11,8 @@
 # Stages: lead | qualified | proposal | won | lost.
 # Custom fields on deals: probability (number), competitor (text), contractSignedDate (date).
 #
-# The write endpoints take flat JSON, not JSON:API resource documents — this API is read-side
-# JSON:API only. Requests below mutate the local SQLite database.
+# Writes accept only JSON:API resource documents (Content-Type: application/vnd.api+json); any
+# other body media type draws a 415. Requests below mutate the local SQLite database.
 
 @host = http://localhost:5031
 
@@ -134,77 +134,187 @@ GET {{host}}/api/deals?fields[deals]=nonexistent
 Accept: application/vnd.api+json
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Writes: flat JSON bodies (deliberately not JSON:API documents)
+# Writes: JSON:API resource documents (Content-Type: application/vnd.api+json is
+# the only accepted body media type). Attributes carry the deal's own fields;
+# company/contact/owner travel as relationships.
 # ─────────────────────────────────────────────────────────────────────────────
 
-### Create a deal with custom fields -> 201 + Location + the created resource document
+### Flat JSON body -> 415 (this API accepts only JSON:API request bodies)
 POST {{host}}/api/deals
 Content-Type: application/json
 
+{ "title": "Flat JSON", "companyId": 1, "ownerId": 1 }
+
+### Create a deal from a spec-shaped resource document -> 201 + Location matching links.self
+POST {{host}}/api/deals
+Content-Type: application/vnd.api+json
+
 {
-  "title": "Globex - warehouse automation",
-  "amount": 95000,
-  "stage": "qualified",
-  "closeDate": "2026-11-30T00:00:00Z",
-  "companyId": 2,
-  "contactId": 3,
-  "ownerId": 2,
-  "customFields": {
-    "probability": 40,
-    "competitor": "Siemens"
+  "data": {
+    "type": "deals",
+    "attributes": {
+      "title": "Globex - conveyor retrofit",
+      "amount": 64000,
+      "stage": "qualified",
+      "closeDate": "2026-12-15T00:00:00Z",
+      "customFields": { "probability": 55, "competitor": "Siemens" }
+    },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "2" } },
+      "contact": { "data": { "type": "contacts", "id": "3" } },
+      "owner": { "data": { "type": "users", "id": "2" } }
+    }
+  }
+}
+
+### Patch one attribute -> 204; missing attributes and relationships keep their current values
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "attributes": { "stage": "won" }
+  }
+}
+
+### Re-point the contact through the relationships member -> 204
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "relationships": {
+      "contact": { "data": { "type": "contacts", "id": "2" } }
+    }
+  }
+}
+
+### Clear the contact with null linkage -> 204 (GET /api/deals/1/relationships/contact shows data: null)
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "relationships": {
+      "contact": { "data": null }
+    }
+  }
+}
+
+### Client-generated id -> 403 (this server assigns ids)
+POST {{host}}/api/deals
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "424242",
+    "attributes": { "title": "Client picked the id" },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "1" } },
+      "owner": { "data": { "type": "users", "id": "1" } }
+    }
+  }
+}
+
+### Wrong resource type for this collection -> 409
+POST {{host}}/api/deals
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "companies",
+    "attributes": { "name": "Wrong collection" }
+  }
+}
+
+### Document id not matching the URL -> 409
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "77777",
+    "attributes": { "stage": "won" }
+  }
+}
+
+### Relationship pointing at a missing company -> 404
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "999" } }
+    }
+  }
+}
+
+### Missing type member -> 400 (a resource object must contain at least a type)
+POST {{host}}/api/deals
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "attributes": { "title": "No type member" }
   }
 }
 
 ### Unknown stage -> 422
-POST {{host}}/api/deals
-Content-Type: application/json
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
 
-{ "title": "Bad stage", "stage": "bogus", "companyId": 1, "ownerId": 1 }
+{
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "attributes": { "stage": "bogus" }
+  }
+}
 
 ### Unknown custom field -> 422
-POST {{host}}/api/deals
-Content-Type: application/json
+PATCH {{host}}/api/deals/1
+Content-Type: application/vnd.api+json
 
 {
-  "title": "Bad deal",
-  "companyId": 1,
-  "ownerId": 1,
-  "customFields": { "nonexistent": 1 }
+  "data": {
+    "type": "deals",
+    "id": "1",
+    "attributes": { "customFields": { "nonexistent": 1 } }
+  }
 }
-
-### Referencing a missing company -> 422
-POST {{host}}/api/deals
-Content-Type: application/json
-
-{ "title": "Orphan deal", "companyId": 999, "ownerId": 1 }
-
-### Update partially -> 204, no body; omitted fields keep their value, customFields merge
-PATCH {{host}}/api/deals/1
-Content-Type: application/json
-
-{
-  "stage": "won",
-  "amount": 120000,
-  "customFields": { "probability": 100 }
-}
-
-### Re-point a deal's contact via flat PATCH (this API's substitute for relationship writes)
-PATCH {{host}}/api/deals/1
-Content-Type: application/json
-
-{ "contactId": 2 }
-
-### Update with an unknown stage -> 422
-PATCH {{host}}/api/deals/1
-Content-Type: application/json
-
-{ "stage": "bogus" }
 
 ### Update a missing deal -> 404
 PATCH {{host}}/api/deals/999
-Content-Type: application/json
+Content-Type: application/vnd.api+json
 
-{ "title": "Ghost" }
+{
+  "data": {
+    "type": "deals",
+    "id": "999",
+    "attributes": { "title": "Ghost" }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Relationship endpoint writes and deletes
+# ─────────────────────────────────────────────────────────────────────────────
+
+### Re-point the contact via the relationship self link (equivalent to the resource-document patch)
+PATCH {{host}}/api/deals/1/relationships/contact
+Content-Type: application/vnd.api+json
+
+{ "data": { "type": "contacts", "id": "2" } }
 
 ### Delete a deal (its custom field values go with it) -> 204
 DELETE {{host}}/api/deals/5

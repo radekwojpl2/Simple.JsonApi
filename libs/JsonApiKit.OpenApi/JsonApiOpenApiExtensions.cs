@@ -21,4 +21,14 @@ public static class JsonApiOpenApiExtensions
         options.AddOperationTransformer<ToOneLinkageOperationTransformer>();
         return options;
     }
+
+    /// <summary>Documents dual-contract write bodies declared via
+    /// <see cref="ResourceDocumentEndpointExtensions.WithResourceDocumentBody"/>: the flat request
+    /// schema for application/json and a JSON:API resource-document schema for
+    /// application/vnd.api+json, which JsonNode-bound endpoints otherwise leave untyped.</summary>
+    public static OpenApiOptions AddJsonApiResourceDocumentBodies(this OpenApiOptions options)
+    {
+        options.AddOperationTransformer<ResourceDocumentOperationTransformer>();
+        return options;
+    }
 }

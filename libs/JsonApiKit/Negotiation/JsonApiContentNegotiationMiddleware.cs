@@ -5,11 +5,14 @@ namespace JsonApiKit;
 
 /// <summary>Enforces the server responsibilities of JSON:API content negotiation
 /// (https://jsonapi.org/format/#content-negotiation-servers): 415 when the request's Content-Type
-/// is the JSON:API media type modified by disallowed parameters, and 406 when every JSON:API
-/// instance in Accept is so modified. 'profile' is allowed (unrecognized profiles must be
-/// ignored); 'ext' is rejected because the kit supports no extensions, and the spec requires
-/// 415/406 for unsupported extension URIs; 'q' is HTTP's quality weight (RFC 9110 §12.4.2), not a
-/// media type parameter, so it does not modify the media type in the spec's sense.</summary>
+/// is anything but the JSON:API media type ("Clients and servers MUST send all JSON:API payloads
+/// using the JSON:API media type in the Content-Type header" — this API serves no other body
+/// contract), 415 when it is the JSON:API media type modified by disallowed parameters, and 406
+/// when every JSON:API instance in Accept is so modified. 'profile' is allowed (unrecognized
+/// profiles must be ignored); 'ext' is rejected because the kit supports no extensions, and the
+/// spec requires 415/406 for unsupported extension URIs; 'q' is HTTP's quality weight
+/// (RFC 9110 §12.4.2), not a media type parameter, so it does not modify the media type in the
+/// spec's sense.</summary>
 public sealed class JsonApiContentNegotiationMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
@@ -17,7 +20,14 @@ public sealed class JsonApiContentNegotiationMiddleware(RequestDelegate next)
         var headers = context.Request.GetTypedHeaders();
 
         var contentType = headers.ContentType;
-        if (contentType is not null && IsJsonApi(contentType) && IsModified(contentType))
+        if (contentType is not null && !IsJsonApi(contentType))
+        {
+            await Reject(context, StatusCodes.Status415UnsupportedMediaType, "Unsupported media type",
+                "This API accepts only JSON:API request bodies; send the payload as " +
+                $"'{JsonApiResults.MediaType}'.");
+            return;
+        }
+        if (contentType is not null && IsModified(contentType))
         {
             await Reject(context, StatusCodes.Status415UnsupportedMediaType, "Unsupported media type",
                 "The JSON:API media type in Content-Type must not be modified by media type " +

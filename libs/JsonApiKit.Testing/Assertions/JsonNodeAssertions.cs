@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace JsonApiKit.Testing;
 
 /// <summary>Object-shaped assertions over JSON:API response JSON.</summary>
-public static class JsonNodeMatchExtensions
+public static class JsonNodeAssertions
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };

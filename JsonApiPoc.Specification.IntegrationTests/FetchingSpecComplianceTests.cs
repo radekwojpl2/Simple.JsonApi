@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using JsonApiPoc.Application.Data;
 using JsonApiPoc.Domain;
@@ -315,8 +314,8 @@ public class FetchingSpecComplianceTests(ApiFactory factory) : ApiTestBase(facto
         var descending = await Client.GetDocumentAsync($"{resource.Route}?sort=-{resource.SortField}");
 
         // Assert
-        AssertSorted(ascending, resource.SortField, descending: false);
-        AssertSorted(descending, resource.SortField, descending: true);
+        ascending.ShouldBeSortedBy(resource.SortField);
+        descending.ShouldBeSortedBy(resource.SortField, descending: true);
     }
 
     /// <summary>"If the server does not support sorting as specified in the query parameter sort,
@@ -348,14 +347,14 @@ public class FetchingSpecComplianceTests(ApiFactory factory) : ApiTestBase(facto
         var last = await Client.GetDocumentAsync($"{resource.Route}?page[size]=1&page[number]=3");
 
         // Assert — the middle page can reach everywhere, the edges lack exactly one neighbour.
-        AssertLinkAvailable(middle, Doc.First);
-        AssertLinkAvailable(middle, Doc.Prev);
-        AssertLinkAvailable(middle, Doc.Next);
-        AssertLinkAvailable(middle, Doc.Last);
-        AssertLinkUnavailable(first, Doc.Prev);
-        AssertLinkAvailable(first, Doc.Next);
-        AssertLinkUnavailable(last, Doc.Next);
-        AssertLinkAvailable(last, Doc.Prev);
+        middle.ShouldHaveAvailableLink(Doc.First);
+        middle.ShouldHaveAvailableLink(Doc.Prev);
+        middle.ShouldHaveAvailableLink(Doc.Next);
+        middle.ShouldHaveAvailableLink(Doc.Last);
+        first.ShouldHaveUnavailableLink(Doc.Prev);
+        first.ShouldHaveAvailableLink(Doc.Next);
+        last.ShouldHaveUnavailableLink(Doc.Next);
+        last.ShouldHaveAvailableLink(Doc.Prev);
     }
 
     /// <summary>"Concepts of order, as expressed in the naming of pagination links, MUST remain
@@ -381,59 +380,10 @@ public class FetchingSpecComplianceTests(ApiFactory factory) : ApiTestBase(facto
     private static Deal DealWithoutContact(AppDbContext db) =>
         db.Deals.Add(Rows.Deal("Hardware upgrade", Rows.Company(), Rows.User())).Entity;
 
-    /// <summary>Ids are database-generated, so they are read off the arranged entity after
-    /// SaveChanges; every domain entity exposes an int Id.</summary>
-    private static int IdOf(object entity) =>
-        (int)entity.GetType().GetProperty("Id")!.GetValue(entity)!;
+    private static int IdOf(object entity) => SpecResources.IdOf(entity);
 
     private static decimal[] Amounts(JsonNode document) =>
         document[Doc.Data]!.AsArray()
             .Select(resource => resource![Doc.Attributes]![Attr.Amount]!.GetValue<decimal>())
             .ToArray();
-
-    /// <summary>Asserts data is ordered by <paramref name="field"/> — numerically when the
-    /// attribute is a JSON number, ordinally when it is a string.</summary>
-    private static void AssertSorted(JsonNode document, string field, bool descending)
-    {
-        var values = document[Doc.Data]!.AsArray()
-            .Select(resource => resource![Doc.Attributes]![field]!.AsValue())
-            .Select(value => value.GetValueKind() == JsonValueKind.Number
-                ? (IComparable)value.GetValue<decimal>()
-                : value.GetValue<string>())
-            .ToList();
-        Assert.True(values.Count >= 2, "Sorting needs at least two rows to prove an order.");
-
-        var expected = descending
-            ? values.OrderByDescending(value => value, Comparer<IComparable>.Create(CompareOrdinal))
-            : values.OrderBy(value => value, Comparer<IComparable>.Create(CompareOrdinal));
-        Assert.Equal(expected, values);
-    }
-
-    /// <summary>Strings compare ordinally (matching the database's byte-wise collation for the
-    /// ASCII test data); other comparables use their natural order.</summary>
-    private static int CompareOrdinal(IComparable left, IComparable right)
-    {
-        if (left is string leftText && right is string rightText)
-        {
-            return string.CompareOrdinal(leftText, rightText);
-        }
-        return left.CompareTo(right);
-    }
-
-    private static void AssertLinkAvailable(JsonNode document, string key)
-    {
-        var links = document[Doc.Links]!.AsObject();
-        Assert.True(links.TryGetPropertyValue(key, out var value) && value is not null,
-            $"links.{key} should be available on this page.");
-    }
-
-    /// <summary>The spec allows either omission or an explicit null for an unavailable link.</summary>
-    private static void AssertLinkUnavailable(JsonNode document, string key)
-    {
-        var links = document[Doc.Links]!.AsObject();
-        if (links.TryGetPropertyValue(key, out var value))
-        {
-            Assert.Null(value);
-        }
-    }
 }

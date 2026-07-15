@@ -1,31 +1,24 @@
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using JsonApiKit;
 using JsonApiPoc.Application.Deals;
 using MediatR;
 
 namespace JsonApiPoc.Endpoints.Deals;
 
+// Request body for PATCH /api/deals/{id} — a JSON:API resource document whose type and id match
+// the URL. Omitted attributes and relationships keep their current values, customFields merge,
+// and "contact": { "data": null } clears the contact.
 public static class UpdateDeal
 {
     public static void Map(RouteGroupBuilder deals) =>
-        deals.MapPatch("/{id:int}", async (ISender sender, int id, UpdateDealRequest request) =>
+        deals.MapPatch("/{id:int}", async (ISender sender, int id, JsonNode? body) =>
         {
-            if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
+            if (DealDocuments.TryReadUpdateCommand(body, id, out var command) is { } invalid)
             {
-                return JsonApiResults.Validation("The 'title' field cannot be empty.");
+                return invalid;
             }
 
-            var result = await sender.Send(new UpdateDealCommand(
-                id,
-                request.Title,
-                request.Amount,
-                request.Stage,
-                request.CloseDate,
-                request.CompanyId,
-                request.ContactId,
-                request.OwnerId,
-                request.CustomFields));
-
+            var result = await sender.Send(command!);
             if (result.Error is { } error)
             {
                 return JsonApiResults.Error(new JsonApiError { StatusCode = error.Status, Title = error.Title, Detail = error.Detail });
@@ -33,14 +26,14 @@ public static class UpdateDeal
 
             return Results.NoContent();
         })
-        .WithSummary("Partially update a deal from a flat JSON object; only provided fields change, customFields are merged. Returns 204 with no body.")
-        .Accepts<UpdateDealRequest>("application/json")
+        .WithSummary("Partially update a deal from a JSON:API resource document; only provided members change, customFields are merged. Returns 204 with no body.")
+        .WithResourceDocumentBody<DealDocuments.DealAttributes>("deals", update: true,
+            new("company", "companies", Required: false, Clearable: false),
+            new("contact", "contacts", Required: false, Clearable: true),
+            new("owner", "users", Required: false, Clearable: false))
         .Produces(204)
+        .ProducesProblem(400)
         .ProducesProblem(404)
+        .ProducesProblem(409)
         .ProducesProblem(422);
 }
-
-// Request body for PATCH /api/deals/{id} — all fields optional, omitted fields keep their current value:
-// { "stage": "won", "amount": 120000, "customFields": { "probability": 100 } }
-public record UpdateDealRequest(string? Title, decimal? Amount, string? Stage, DateTime? CloseDate,
-    int? CompanyId, int? ContactId, int? OwnerId, Dictionary<string, JsonElement>? CustomFields);

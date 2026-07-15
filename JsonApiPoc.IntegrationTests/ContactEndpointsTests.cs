@@ -232,15 +232,16 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         });
 
         // Act + Assert — create: 201 with Location and the full created resource as the body.
-        var created = await Client.PostAsJsonAsync(Routes.Contacts, new
-        {
-            firstName = "Tomasz",
-            lastName = "Lis",
-            email = "tomasz.lis@acme.example.com",
-            phone = "+48 500 100 200",
-            companyId = company.Id,
-            customFields = new { leadSource = "conference" }
-        });
+        var created = await Client.PostJsonApiAsync(Routes.Contacts, Document.Post(ResourceTypes.Contacts,
+            new
+            {
+                firstName = "Tomasz",
+                lastName = "Lis",
+                email = "tomasz.lis@acme.example.com",
+                phone = "+48 500 100 200",
+                customFields = new { leadSource = "conference" }
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id)));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal(JsonApiMediaTypes.JsonApi, created.Content.Headers.ContentType?.MediaType);
 
@@ -258,7 +259,8 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
             Document.Contact(tomasz, customFields: new { leadSource = "conference" })));
 
         // Act + Assert — patch: only provided fields change.
-        var patched = await Client.PatchAsJsonAsync(location, new { email = "t.lis@acme.example.com" });
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Contacts, id, new { email = "t.lis@acme.example.com" }));
         Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
 
         tomasz.Email = "t.lis@acme.example.com";
@@ -273,15 +275,84 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task Post_JsonApiResourceDocument_CreatesContact()
+    {
+        // Arrange
+        var company = await ArrangeAsync(db => db.Companies.Add(Rows.Company()).Entity);
+
+        // Act — a create with every attribute and the company relationship.
+        var created = await Client.PostJsonApiAsync(Routes.Contacts, Document.Post(ResourceTypes.Contacts,
+            new
+            {
+                firstName = "Tomasz",
+                lastName = "Lis",
+                email = "tomasz.lis@acme.example.com",
+                phone = "+48 500 100 200"
+            },
+            (Rel.Company, ResourceTypes.Companies, company.Id)));
+
+        // Assert — 201 with Location and the full created resource.
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var location = created.Headers.Location!.ToString();
+        var body = JsonNode.Parse(await created.Content.ReadAsStringAsync())!;
+        var id = int.Parse(body[Doc.Data]![Doc.Id]!.GetValue<string>());
+        Assert.Equal($"{Routes.Contacts}/{id}", location);
+
+        var tomasz = new Contact
+        {
+            Id = id, FirstName = "Tomasz", LastName = "Lis",
+            Email = "tomasz.lis@acme.example.com", Phone = "+48 500 100 200", CompanyId = company.Id
+        };
+        body.ShouldMatchExactly(Document.Single(Document.Contact(tomasz)));
+    }
+
+    [Fact]
+    public async Task Patch_JsonApiResourceDocument_UpdatesAttributesAndRepointsCompany()
+    {
+        // Arrange — a contact and the second company the patch moves it to.
+        var (contact, newCompany) = await ArrangeAsync(db =>
+            (db.Contacts.Add(Rows.Contact("Jan", "Kowalski", Rows.Company())).Entity,
+                db.Companies.Add(Rows.Company("Zephyr Labs", "Software")).Entity));
+        var location = $"{Routes.Contacts}/{contact.Id}";
+
+        // Act — one attribute and the company relationship; everything else keeps its value.
+        var patched = await Client.PatchJsonApiAsync(location,
+            Document.Patch(ResourceTypes.Contacts, contact.Id, new { email = "jan.kowalski@zephyr.example.com" },
+                (Rel.Company, ResourceTypes.Companies, newCompany.Id)));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, patched.StatusCode);
+        contact.Email = "jan.kowalski@zephyr.example.com";
+        contact.CompanyId = newCompany.Id;
+        var reloaded = await Client.GetDocumentAsync(location);
+        reloaded.ShouldMatchExactly(Document.Single(Document.Contact(contact)));
+    }
+
+    [Fact]
     public async Task Post_MissingRequiredFields_Returns422()
     {
         // Act
-        var response = await Client.PostAsJsonAsync(Routes.Contacts, new { email = "nobody@example.com" });
+        var response = await Client.PostJsonApiAsync(Routes.Contacts,
+            Document.Post(ResourceTypes.Contacts, new { email = "nobody@example.com" }));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
         problem.ShouldMatchExactly(Document.Problem(422, "Validation failed",
             "The 'firstName' and 'lastName' fields are required."));
+    }
+
+    /// <summary>The API's only write contract is JSON:API; a flat application/json body is
+    /// refused up front by the content negotiation middleware.</summary>
+    [Fact]
+    public async Task Post_FlatJsonContentType_Returns415()
+    {
+        // Act
+        var response = await Client.PostAsJsonAsync(Routes.Contacts, new { firstName = "Flat" });
+
+        // Assert
+        var problem = await response.ReadProblemAsync(415);
+        problem.ShouldMatchExactly(Document.Problem(415, "Unsupported media type",
+            "This API accepts only JSON:API request bodies; send the payload as 'application/vnd.api+json'."));
     }
 
     /// <summary>Referencing a resource that does not exist is a 404 per the JSON:API spec
@@ -291,12 +362,9 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task Post_UnknownCompany_Returns404()
     {
         // Act
-        var response = await Client.PostAsJsonAsync(Routes.Contacts, new
-        {
-            firstName = "Ola",
-            lastName = "Mazur",
-            companyId = 99999
-        });
+        var response = await Client.PostJsonApiAsync(Routes.Contacts,
+            Document.Post(ResourceTypes.Contacts, new { firstName = "Ola", lastName = "Mazur" },
+                (Rel.Company, ResourceTypes.Companies, 99999)));
 
         // Assert
         var problem = await response.ReadProblemAsync(404);
@@ -311,13 +379,15 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var company = await ArrangeAsync(db => db.Companies.Add(Rows.Company()).Entity);
 
         // Act
-        var response = await Client.PostAsJsonAsync(Routes.Contacts, new
-        {
-            firstName = "Ewa",
-            lastName = "Kot",
-            companyId = company.Id,
-            customFields = new { bogusField = "x" }
-        });
+        var response = await Client.PostJsonApiAsync(Routes.Contacts,
+            Document.Post(ResourceTypes.Contacts,
+                new
+                {
+                    firstName = "Ewa",
+                    lastName = "Kot",
+                    customFields = new { bogusField = "x" }
+                },
+                (Rel.Company, ResourceTypes.Companies, company.Id)));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
@@ -334,7 +404,9 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
             db.Contacts.Add(Rows.Contact("Jan", "Kowalski", Rows.Company())).Entity);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Contacts}/{contact.Id}", new { companyId = 99999 });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Contacts}/{contact.Id}",
+            Document.Patch(ResourceTypes.Contacts, contact.Id, attributes: null,
+                (Rel.Company, ResourceTypes.Companies, 99999)));
 
         // Assert
         var problem = await response.ReadProblemAsync(404);
@@ -345,7 +417,8 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task Patch_UnknownId_Returns404()
     {
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Contacts}/99999", new { email = "x@example.com" });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Contacts}/99999",
+            Document.Patch(ResourceTypes.Contacts, 99999, new { email = "x@example.com" }));
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -359,7 +432,8 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
             db.Contacts.Add(Rows.Contact("Jan", "Kowalski", Rows.Company())).Entity);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Contacts}/{contact.Id}", new { firstName = "" });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Contacts}/{contact.Id}",
+            Document.Patch(ResourceTypes.Contacts, contact.Id, new { firstName = "" }));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);
@@ -377,8 +451,8 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
         var linkageUrl = $"{Routes.Contacts}/{contact.Id}/relationships/company";
 
         // Act
-        var response = await Client.PatchAsJsonAsync(linkageUrl,
-            new { data = new { type = ResourceTypes.Companies, id = newCompany.Id.ToString() } });
+        var response = await Client.PatchJsonApiAsync(linkageUrl,
+            Document.Linkage((ResourceTypes.Companies, newCompany.Id)));
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -397,8 +471,8 @@ public class ContactEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
             db.Contacts.Add(Rows.Contact("Jan", "Kowalski", Rows.Company())).Entity);
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Contacts}/{contact.Id}/relationships/company",
-            new { data = (object?)null });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Contacts}/{contact.Id}/relationships/company",
+            Document.Linkage(null));
 
         // Assert
         var problem = await response.ReadProblemAsync(422);

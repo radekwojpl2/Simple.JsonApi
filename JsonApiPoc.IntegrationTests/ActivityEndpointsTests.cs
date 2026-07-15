@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-
 namespace JsonApiPoc.IntegrationTests;
 
 [Collection(ApiCollection.Name)]
@@ -11,8 +9,8 @@ public class ActivityEndpointsTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task PatchRelationship_Deal_Returns403()
     {
         // Act
-        var response = await Client.PatchAsJsonAsync($"{Routes.Activities}/1/relationships/deal",
-            new { data = (object?)null });
+        var response = await Client.PatchJsonApiAsync($"{Routes.Activities}/1/relationships/deal",
+            Document.Linkage(null));
 
         // Assert
         var problem = await response.ReadProblemAsync(403);

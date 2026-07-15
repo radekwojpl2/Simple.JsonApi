@@ -114,6 +114,11 @@ public static class SpecResources
 
     public static SpecResource Get(string key) => All[key];
 
+    /// <summary>Ids are database-generated, so they are read off the entity an ArrangeOne
+    /// returned after SaveChanges; every domain entity exposes an int Id.</summary>
+    public static int IdOf(object entity) =>
+        (int)entity.GetType().GetProperty("Id")!.GetValue(entity)!;
+
     public static TheoryData<string> Keys() => Data(All.Keys);
 
     public static TheoryData<string> GetByIdKeys() =>

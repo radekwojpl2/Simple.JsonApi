@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace JsonApiKit.Testing;
@@ -59,6 +63,48 @@ public static class JsonApiHttpClientExtensions
             throw new InvalidOperationException($"{url} returned a problem document without a traceId.");
         }
         return problem;
+    }
+
+    /// <summary>Asserts the spec's successful-write contract for updates and deletions
+    /// (https://jsonapi.org/format/#crud): 200 OK with a response document, or 204 No Content.</summary>
+    public static void ShouldBeSuccessfulWrite(this HttpResponseMessage response)
+    {
+        var url = response.RequestMessage?.RequestUri?.PathAndQuery ?? "(unknown)";
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            if (response.Content.Headers.ContentLength is not > 0)
+            {
+                throw new HttpRequestException(
+                    $"{url} returned 200 OK without a body; a 200 write response must carry a response document.");
+            }
+            return;
+        }
+        if (response.StatusCode != HttpStatusCode.NoContent)
+        {
+            throw new HttpRequestException(
+                $"{url} returned {(int)response.StatusCode}, expected a successful write: 200 with a document, or 204.");
+        }
+    }
+
+    /// <summary>POSTs <paramref name="document"/> serialized as a JSON:API request body:
+    /// application/vnd.api+json with no media type parameters (a charset parameter would rightly
+    /// draw a 415).</summary>
+    public static Task<HttpResponseMessage> PostJsonApiAsync(this HttpClient client, string url,
+        object document) =>
+        client.PostAsync(url, JsonApiContent(document));
+
+    /// <inheritdoc cref="PostJsonApiAsync"/>
+    public static Task<HttpResponseMessage> PatchJsonApiAsync(this HttpClient client, string url,
+        object document) =>
+        client.PatchAsync(url, JsonApiContent(document));
+
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    private static HttpContent JsonApiContent(object document)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(document, Web), Encoding.UTF8);
+        content.Headers.ContentType = new MediaTypeHeaderValue(JsonApiMediaTypes.JsonApi);
+        return content;
     }
 
     /// <summary>Id of the first resource in the collection at <paramref name="collectionUrl"/>

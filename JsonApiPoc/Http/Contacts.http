@@ -7,8 +7,8 @@
 #       4 Anna Zielinska (Initech), 5 Adam Kowalski (Initech).
 # Custom fields on contacts: leadSource (text), newsletterOptIn (boolean).
 #
-# The write endpoints take flat JSON, not JSON:API resource documents — this API is read-side
-# JSON:API only. Requests below mutate the local SQLite database.
+# Writes accept only JSON:API resource documents (Content-Type: application/vnd.api+json); any
+# other body media type draws a 415. Requests below mutate the local SQLite database.
 
 @host = http://localhost:5031
 
@@ -109,69 +109,160 @@ GET {{host}}/api/contacts?fields[gadgets]=name
 Accept: application/vnd.api+json
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Writes: flat JSON bodies (deliberately not JSON:API documents)
+# Writes: JSON:API resource documents (Content-Type: application/vnd.api+json is
+# the only accepted body media type). Attributes carry the contact's own fields;
+# company travels as a relationship.
 # ─────────────────────────────────────────────────────────────────────────────
 
-### Create a contact with custom fields -> 201 + Location + the created resource document
+### Flat JSON body -> 415 (this API accepts only JSON:API request bodies)
 POST {{host}}/api/contacts
 Content-Type: application/json
 
+{ "firstName": "Flat", "lastName": "Json", "companyId": 1 }
+
+### Create a contact from a spec-shaped resource document -> 201 + Location matching links.self
+POST {{host}}/api/contacts
+Content-Type: application/vnd.api+json
+
 {
-  "firstName": "Tomasz",
-  "lastName": "Mazur",
-  "email": "tomasz@initech.example.com",
-  "phone": "+48 500 200 100",
-  "companyId": 3,
-  "customFields": {
-    "leadSource": "conference",
-    "newsletterOptIn": false
+  "data": {
+    "type": "contacts",
+    "attributes": {
+      "firstName": "Ewa",
+      "lastName": "Lewandowska",
+      "email": "ewa@globex.example.com",
+      "phone": "+48 600 300 200",
+      "customFields": { "leadSource": "referral", "newsletterOptIn": true }
+    },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "2" } }
+    }
   }
 }
 
-### Missing required field -> 422
-POST {{host}}/api/contacts
-Content-Type: application/json
+### Patch one attribute -> 204; missing attributes and relationships keep their current values
+PATCH {{host}}/api/contacts/1
+Content-Type: application/vnd.api+json
 
-{ "firstName": "NoLastName", "companyId": 1 }
+{
+  "data": {
+    "type": "contacts",
+    "id": "1",
+    "attributes": { "email": "jan.kowalski@acme.example.com" }
+  }
+}
+
+### Move the contact to another company through the relationships member -> 204
+PATCH {{host}}/api/contacts/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "1",
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "3" } }
+    }
+  }
+}
+
+### Company is required, so null linkage -> 422 (a contact always belongs to a company)
+PATCH {{host}}/api/contacts/1
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "1",
+    "relationships": {
+      "company": { "data": null }
+    }
+  }
+}
+
+### Client-generated id -> 403 (this server assigns ids)
+POST {{host}}/api/contacts
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "424242",
+    "attributes": { "firstName": "Client", "lastName": "PickedTheId" },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "1" } }
+    }
+  }
+}
+
+### Wrong resource type for this collection -> 409
+POST {{host}}/api/contacts
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "deals",
+    "attributes": { "title": "Wrong collection" }
+  }
+}
+
+### Missing required attributes -> 422
+POST {{host}}/api/contacts
+Content-Type: application/vnd.api+json
+
+{
+  "data": {
+    "type": "contacts",
+    "attributes": { "email": "nobody@example.com" },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "1" } }
+    }
+  }
+}
 
 ### Unknown custom field -> 422
 POST {{host}}/api/contacts
-Content-Type: application/json
+Content-Type: application/vnd.api+json
 
 {
-  "firstName": "Bad",
-  "lastName": "Field",
-  "email": "bad@example.com",
-  "companyId": 1,
-  "customFields": { "nonexistent": 1 }
+  "data": {
+    "type": "contacts",
+    "attributes": {
+      "firstName": "Bad",
+      "lastName": "Field",
+      "customFields": { "nonexistent": 1 }
+    },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "1" } }
+    }
+  }
 }
 
-### Referencing a missing company -> 422
+### Relationship pointing at a missing company -> 404
 POST {{host}}/api/contacts
-Content-Type: application/json
-
-{ "firstName": "Orphan", "lastName": "Contact", "email": "orphan@example.com", "companyId": 999 }
-
-### Update partially -> 204, no body; omitted fields keep their value, customFields merge
-PATCH {{host}}/api/contacts/1
-Content-Type: application/json
+Content-Type: application/vnd.api+json
 
 {
-  "email": "updated@example.com",
-  "customFields": { "newsletterOptIn": true }
+  "data": {
+    "type": "contacts",
+    "attributes": { "firstName": "Orphan", "lastName": "Contact" },
+    "relationships": {
+      "company": { "data": { "type": "companies", "id": "999" } }
+    }
+  }
 }
-
-### Move a contact to another company via flat PATCH (this API's substitute for relationship writes)
-PATCH {{host}}/api/contacts/1
-Content-Type: application/json
-
-{ "companyId": 2 }
 
 ### Update a missing contact -> 404
 PATCH {{host}}/api/contacts/999
-Content-Type: application/json
+Content-Type: application/vnd.api+json
 
-{ "firstName": "Ghost" }
+{
+  "data": {
+    "type": "contacts",
+    "id": "999",
+    "attributes": { "firstName": "Ghost" }
+  }
+}
 
 ### Delete a contact (deals/activities referencing it get their contact set to null) -> 204
 DELETE {{host}}/api/contacts/5

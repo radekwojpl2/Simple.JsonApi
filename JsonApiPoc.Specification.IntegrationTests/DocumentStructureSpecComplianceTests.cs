@@ -11,22 +11,28 @@ namespace JsonApiPoc.Specification.IntegrationTests;
 public class DocumentStructureSpecComplianceTests(ApiFactory factory) : ApiTestBase(factory)
 {
     /// <summary>"The members data and errors MUST NOT coexist in the same document." — every
-    /// successful document carries data and must not carry errors.</summary>
-    [Fact]
-    public async Task TopLevel_DataAndErrors_NeverCoexist()
+    /// successful document carries data and must not carry errors, checked on the collection and
+    /// by-id documents of every resource in the <see cref="SpecResources"/> catalog.</summary>
+    [Theory]
+    [MemberData(nameof(SpecResources.Keys), MemberType = typeof(SpecResources))]
+    public async Task TopLevel_DataAndErrors_NeverCoexist(string key)
     {
         // Arrange
-        var deal = await ArrangeAsync(OneDeal);
+        var resource = SpecResources.Get(key);
+        var id = SpecResources.IdOf(await ArrangeAsync(resource.ArrangeOne));
 
         // Act
-        var collection = (await Client.GetDocumentAsync(Routes.Deals)).AsObject();
-        var single = (await Client.GetDocumentAsync($"{Routes.Deals}/{deal.Id}")).AsObject();
+        var collection = (await Client.GetDocumentAsync(resource.Route)).AsObject();
 
         // Assert
         Assert.True(collection.ContainsKey(Doc.Data));
         Assert.False(collection.ContainsKey(Doc.Errors));
-        Assert.True(single.ContainsKey(Doc.Data));
-        Assert.False(single.ContainsKey(Doc.Errors));
+        if (resource.HasGetById)
+        {
+            var single = (await Client.GetDocumentAsync($"{resource.Route}/{id}")).AsObject();
+            Assert.True(single.ContainsKey(Doc.Data));
+            Assert.False(single.ContainsKey(Doc.Errors));
+        }
     }
 
     /// <summary>"A compound document MUST NOT include more than one resource object for each type

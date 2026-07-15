@@ -115,6 +115,12 @@ The spec permits omitting `data`, and doing so keeps a collection response from 
 
 `JsonApiToOneDocument` exists for relationship endpoints: it serializes `"data": null` explicitly for an empty to-one, which the default null-omitting options would otherwise drop.
 
+### Write requests — `ResourceDocument`
+
+`ResourceDocument.TryParseCreate` / `TryParseUpdate` parse the primary resource object of a POST/PATCH body ([§ creating](https://jsonapi.org/format/#crud-creating), [§ updating](https://jsonapi.org/format/#crud-updating)) and return a ready-made error result for the spec's failure modes: **400** for anything that is not a document with a single resource object (or an update without `type` and `id`), **409** for a `type`/`id` that does not match the endpoint, **403** for a client-generated id on a create. On success, `TryReadAttributes<T>` deserializes the attributes into your request record and `TryGetToOne` reads relationship linkage (distinguishing *absent* — keep the current value — from `data: null` — clear).
+
+Write endpoints bind `JsonNode?` (the document needs structural validation before typing) and hand it straight to the parser; `ToOneLinkage.TryParse` remains the parser for standalone `/relationships/{name}` update bodies.
+
 ### Errors
 
 All errors — hand-written and binding — render as RFC 7807 problem details (`application/problem+json`), consistent with the framework-generated errors of an ASP.NET Core app. Endpoints write their own through static helpers on `JsonApiResults`:
@@ -126,7 +132,7 @@ All errors — hand-written and binding — render as RFC 7807 problem details (
 
 ### Content negotiation
 
-`app.UseJsonApiContentNegotiation()` enforces the spec's server responsibilities ([§ content negotiation](https://jsonapi.org/format/#content-negotiation-servers)): a request whose `Content-Type` is the JSON:API media type modified by disallowed parameters gets **415**, and a request whose `Accept` offers the JSON:API media type only in modified instances gets **406**. `profile` is allowed (unrecognized profiles are ignored), `ext` is rejected because the kit supports no extensions, and `q` is exempt as HTTP's quality weight rather than a media type parameter.
+`app.UseJsonApiContentNegotiation()` enforces the spec's server responsibilities ([§ content negotiation](https://jsonapi.org/format/#content-negotiation-servers)): a request whose `Content-Type` is anything but the JSON:API media type gets **415** (JSON:API is the only body contract the kit serves), a JSON:API `Content-Type` modified by disallowed parameters gets **415**, and a request whose `Accept` offers the JSON:API media type only in modified instances gets **406**. `profile` is allowed (unrecognized profiles are ignored), `ext` is rejected because the kit supports no extensions, and `q` is exempt as HTTP's quality weight rather than a media type parameter.
 
 ### OpenAPI (optional — `JsonApiKit.OpenApi`)
 
@@ -140,7 +146,7 @@ Each operation gains `include`, `sort`, `page[number]`, `page[size]`, `filter[..
 
 ## Scope — what JsonApiKit does *not* do
 
-- **Request-body parsing.** Incoming POST/PATCH resource documents are your endpoint's job; the kit only produces responses and parses the query string. The one exception is `ToOneLinkage.TryParse`, which parses the spec's to-one relationship update body (`{"data": {"type","id"}}` or `{"data": null}`) into a target id or a ready-made 400/409 error result.
+- **Mapping write bodies onto your model.** `ResourceDocument` and `ToOneLinkage` validate the spec's document structure and status-code semantics, but turning attributes and linkage into your commands/entities — including which relationships exist and which are required or clearable — is your endpoint's job.
 - **Compound-document assembly.** `include` is validated, but building the `included` array (and deduplicating by type/id) is done in the endpoint.
 - **Query execution.** `Sort` and `Filter` give you validated values; translating them to your data layer is up to you.
 
