@@ -1,9 +1,11 @@
 name: Release
 
-# Manual releases only: run from the Actions tab (on main). The run builds and tests the
-# solution, lets semantic-release compute the next version from the Conventional Commits
-# since the last tag, then packs and publishes the packages when a release was cut.
+# Every merge to main builds and tests the solution, lets semantic-release compute the
+# next version from the Conventional Commits since the last tag, then packs and publishes
+# the packages when a release was cut. workflow_dispatch allows re-running manually.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
