@@ -41,6 +41,7 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     permissions:
+      contents: read # a job-level permissions block drops everything unlisted, checkout included
       id-token: write # enable GitHub OIDC token issuance for NuGet Trusted Publishing
 
     steps:
