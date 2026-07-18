@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Minimal, strongly typed JSON:API (https://jsonapi.org/format/) request and response documents on System.Text.Json. No framework coupling, no validation pipeline — just the wire model.</Description>
+  </PropertyGroup>
+
+</Project>
