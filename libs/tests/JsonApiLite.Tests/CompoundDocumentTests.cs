@@ -111,7 +111,7 @@ public class CompoundDocumentTests
         {
             Data = [],
             Links = new Links { Self = "/contacts?page[number]=1" },
-            Meta = new Meta(Total: 0, PageCount: 0),
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 0, PageCount: 0)),
         };
 
         Assert.Equal(
@@ -144,7 +144,7 @@ public class CompoundDocumentTests
                 Next = "/contacts?page[number]=3",
                 Last = "/contacts?page[number]=5",
             },
-            Meta = new Meta(Total: 42, PageCount: 5),
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 42, PageCount: 5)),
         };
 
     private static Resource<ContactAttributes, ContactRelationships> Contact(string id,

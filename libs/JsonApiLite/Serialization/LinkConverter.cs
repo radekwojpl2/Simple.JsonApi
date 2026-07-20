@@ -20,7 +20,7 @@ internal sealed class LinkConverter : JsonConverter<Link>
         }
 
         string? href = null;
-        JsonObject? meta = null;
+        Meta? meta = null;
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
             var name = reader.GetString();
@@ -31,7 +31,7 @@ internal sealed class LinkConverter : JsonConverter<Link>
                     href = reader.GetString();
                     break;
                 case "meta":
-                    meta = JsonSerializer.Deserialize<JsonObject>(ref reader, options);
+                    meta = JsonSerializer.Deserialize<Meta>(ref reader, options);
                     break;
                 default:
                     reader.Skip();

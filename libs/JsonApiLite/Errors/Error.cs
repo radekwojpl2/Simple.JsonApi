@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-
 namespace JsonApiLite;
 
 /// <summary>One spec error object; all members are optional, so an endpoint states only what it
@@ -25,5 +23,5 @@ public sealed record Error
     /// about this occurrence.</summary>
     public Links? Links { get; init; }
 
-    public JsonObject? Meta { get; init; }
+    public Meta? Meta { get; init; }
 }

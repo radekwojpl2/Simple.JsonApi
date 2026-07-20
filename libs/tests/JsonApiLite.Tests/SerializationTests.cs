@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace JsonApiLite.Tests;
 
 public class SerializationTests
@@ -81,7 +83,7 @@ public class SerializationTests
         {
             Data = [new Resource<ContactAttributes> { Type = ContactAttributes.ResourceType, Id = "1" }],
             Links = new Links { Self = "/contacts?page[number]=1", Next = "/contacts?page[number]=2" },
-            Meta = new Meta(Total: 3, PageCount: 2),
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 3, PageCount: 2)),
         };
 
         Assert.Equal(
@@ -185,7 +187,7 @@ public class SerializationTests
             [
                 new Resource<CompanyAttributes> { Type = CompanyAttributes.ResourceType, Id = "7", Attributes = new CompanyAttributes("Acme") },
             ],
-            Meta = new Meta(Total: 1, PageCount: 1),
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 1, PageCount: 1)),
         };
 
         var json = JsonApiSerializer.Serialize(document);

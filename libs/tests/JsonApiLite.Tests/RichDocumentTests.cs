@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace JsonApiLite.Tests;
 
 /// <summary>Complexity tier 1: single documents that combine every feature at once — mixed
@@ -83,6 +85,51 @@ public class RichDocumentTests
         Assert.Empty(relationships.Contacts.Data);
         Assert.Equal("negotiation", document.Data.Attributes!.Stage);
         Assert.Null(document.Data.Attributes.Title);
+    }
+
+    [Fact]
+    public void A_declared_meta_type_writes_its_own_members()
+    {
+        var document = new ResourceCollectionDocument<DealAttributes, DealRelationships, PageMeta>
+        {
+            Data = [],
+            Meta = new PageMeta(Total: 2, PageCount: 1, GeneratedAt: "2026-07-20"),
+        };
+
+        Assert.Equal(
+            """{"data":[],"meta":{"total":2,"pageCount":1,"generatedAt":"2026-07-20"}}""",
+            JsonApiSerializer.Serialize(document));
+    }
+
+    [Fact]
+    public void A_declared_meta_type_survives_a_round_trip()
+    {
+        var meta = new PageMeta(Total: 2, GeneratedAt: "2026-07-20");
+        var document = Wire.Roundtrip(new ResourceDocument<DealAttributes, DealRelationships, PageMeta>
+        {
+            Data = new Resource<DealAttributes, DealRelationships>
+            {
+                Type = DealAttributes.ResourceType,
+                Id = "42",
+            },
+            Meta = meta,
+        });
+
+        Assert.Equal(meta, document.Meta);
+        Assert.Null(document.Meta!.PageCount);
+    }
+
+    [Fact]
+    public void Leaving_the_meta_type_unspoken_keeps_the_built_in_one()
+    {
+        var document = Wire.Roundtrip(new ResourceCollectionDocument<DealAttributes, DealRelationships>
+        {
+            Data = [],
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 2, PageCount: 1)),
+        });
+
+        // The wire carries no type name, so meta reads back as the base type: recover the shape.
+        Assert.Equal(new PageMeta(Total: 2, PageCount: 1), document.Meta!.As<PageMeta>());
     }
 
     [Fact]

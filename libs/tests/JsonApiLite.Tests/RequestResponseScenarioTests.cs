@@ -208,7 +208,7 @@ public class RequestResponseScenarioTests
                 },
             ],
             Links = new Links { Self = "/deals/42?include=company" },
-            Meta = new Meta(Total: 1, PageCount: 1),
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 1, PageCount: 1)),
         };
 
         var first = JsonApiSerializer.Serialize(document);

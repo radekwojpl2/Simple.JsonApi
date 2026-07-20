@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace JsonApiLite;
@@ -9,7 +8,7 @@ namespace JsonApiLite;
 [JsonConverter(typeof(LinkConverter))]
 public sealed record Link(string Href)
 {
-    public JsonObject? Meta { get; init; }
+    public Meta? Meta { get; init; }
 
     public static implicit operator Link?(string? href)
     {

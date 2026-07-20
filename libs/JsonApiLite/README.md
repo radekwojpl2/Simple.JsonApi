@@ -65,9 +65,45 @@ explicit null never matters.
 - `LinksRelationship` — spec-valid links-only relationship (reading other servers' responses).
 - Media type: `JsonApiMediaType.Value`.
 
+## Typed meta
+
+The spec reserves no meta member names — meta is as user-defined as `attributes` — so nothing is
+typed in advance. Documents take the shape as a type parameter:
+
+```csharp
+public sealed record PageMeta(int? Total, string? GeneratedAt);
+
+new ResourceCollectionDocument<ContactAttributes, ContactRelationships, PageMeta>
+{
+    Data = [],
+    Meta = new PageMeta(Total: 2, GeneratedAt: "2026-07-20"),
+};
+```
+
+Everywhere else — link, relationship and error meta — the shape is named at construction with
+`Meta<T>`:
+
+```csharp
+Meta = new Meta<PageMeta>(new PageMeta(Total: 2, GeneratedAt: "2026-07-20")),
+```
+
+Those positions store the base `Meta` rather than a type parameter of their own, because a
+parameter on `Link` would cascade into `Links` and every type holding one. That also means the
+wire carries no type name, so meta read back off the wire is the base type — recover the shape
+with `As<T>()`, or reach for members by name when there is no shape to recover:
+
+```csharp
+document.Meta!.As<PageMeta>()            // as a declared type
+document.Meta!.Members["generatedAt"]    // whatever the server actually sent
+```
+
+Document meta cannot be typed on the dictionary-relationship document either:
+`ResourceDocument<TAttributes, TMeta>` is indistinguishable from
+`ResourceDocument<TAttributes, TRelationships>`, which C# resolves by arity alone.
+
 ## Tests as documentation
 
-`libs/tests/JsonApiLite.Tests` (66 tests): `Serialization`/`Deserialization` pin single features
+`libs/tests/JsonApiLite.Tests` (74 tests): `Serialization`/`Deserialization` pin single features
 to exact wire JSON; `TypedRelationships`, `OptionalAttribute`, `SpecCompliance` cover their
 namesakes; `RichDocument` → `CompoundDocument` → `RequestResponseScenario` climb from full
 documents to whole client↔server cycles. Valid documents are built as objects and round-tripped

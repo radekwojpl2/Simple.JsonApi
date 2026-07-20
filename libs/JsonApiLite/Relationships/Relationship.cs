@@ -12,6 +12,10 @@ public abstract record Relationship
 {
     public Links? Links { get; init; }
 
+    /// <summary>Relationship-level meta, free-form per the spec — a member count, a role, a
+    /// timestamp on the association itself rather than on either resource.</summary>
+    public Meta? Meta { get; init; }
+
     public static ToOneRelationship ToOne(string type, string id) =>
         new(new ResourceIdentifier(type, id));
 

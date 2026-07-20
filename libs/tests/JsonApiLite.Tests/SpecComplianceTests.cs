@@ -61,7 +61,7 @@ public class SpecComplianceTests
             Data = [],
             Links = new Links
             {
-                Self = new Link("/contacts") { Meta = new JsonObject { ["count"] = 10 } },
+                Self = new Link("/contacts") { Meta = new Meta<CountMeta>(new CountMeta(10)) },
                 Next = "/contacts?page[number]=2",
             },
         };
@@ -73,7 +73,7 @@ public class SpecComplianceTests
 
         var reread = JsonApiSerializer.Deserialize<ResourceCollectionDocument<ContactAttributes>>(json)!;
         Assert.Equal("/contacts", reread.Links!.Self!.Href);
-        Assert.Equal(10, (int)reread.Links.Self.Meta!["count"]!);
+        Assert.Equal(new CountMeta(10), reread.Links.Self.Meta!.As<CountMeta>());
         Assert.Equal("/contacts?page[number]=2", reread.Links.Next!.Href);
     }
 
@@ -93,7 +93,7 @@ public class SpecComplianceTests
                     Detail = "The title attribute is required.",
                     Source = new ErrorSource { Pointer = "/data/attributes/title" },
                     Links = new Links { About = "/errors/validation" },
-                    Meta = new JsonObject { ["attempt"] = 2 },
+                    Meta = new Meta<AttemptMeta>(new AttemptMeta(2)),
                 },
             ],
         };
@@ -107,18 +107,23 @@ public class SpecComplianceTests
         var error = Assert.Single(reread.Errors);
         Assert.Equal("validation", error.Code);
         Assert.Equal("/errors/validation", error.Links!.About!.Href);
-        Assert.Equal(2, (int)error.Meta!["attempt"]!);
+        Assert.Equal(new AttemptMeta(2), error.Meta!.As<AttemptMeta>());
     }
 
     [Fact]
-    public void Custom_meta_round_trips_through_extension_data()
+    public void Meta_carries_whatever_members_the_endpoint_sent()
     {
         var document = new ResourceCollectionDocument<ContactAttributes>
         {
             Data = [],
-            Meta = new Meta(Total: 42, PageCount: 5)
+            Meta = new Meta
             {
-                Additional = new JsonObject { ["generatedAt"] = "2026-07-18" },
+                Members = new JsonObject
+                {
+                    ["total"] = 42,
+                    ["pageCount"] = 5,
+                    ["generatedAt"] = "2026-07-18",
+                },
             },
         };
 
@@ -128,8 +133,25 @@ public class SpecComplianceTests
             json);
 
         var reread = JsonApiSerializer.Deserialize<ResourceCollectionDocument<ContactAttributes>>(json)!;
-        Assert.Equal(42, reread.Meta!.Total);
-        Assert.Equal("2026-07-18", (string)reread.Meta.Additional!["generatedAt"]!);
+        Assert.Equal(42, (int)reread.Meta!.Members["total"]!);
+        Assert.Equal("2026-07-18", (string)reread.Meta.Members["generatedAt"]!);
+    }
+
+    [Fact]
+    public void Meta_reads_back_as_a_declared_shape()
+    {
+        var json = JsonApiSerializer.Serialize(new ResourceCollectionDocument<ContactAttributes>
+        {
+            Data = [],
+            Meta = new Meta<PageMeta>(new PageMeta(Total: 42, PageCount: 5, GeneratedAt: "2026-07-18")),
+        });
+
+        Assert.Equal("""{"data":[],"meta":{"total":42,"pageCount":5,"generatedAt":"2026-07-18"}}""", json);
+
+        var reread = JsonApiSerializer.Deserialize<ResourceCollectionDocument<ContactAttributes>>(json)!;
+        Assert.Equal(
+            new PageMeta(Total: 42, PageCount: 5, GeneratedAt: "2026-07-18"),
+            reread.Meta!.As<PageMeta>());
     }
 
     [Fact]
@@ -147,7 +169,7 @@ public class SpecComplianceTests
                     Attributes = new CompanyAttributes("Acme"),
                     Relationships = new CompanyRelationships
                     {
-                        Owner = Relationship.ToOne<UserAttributes>("9"),
+                        Owner = Relationship.ToOne<UserAttributes>("9") with { Meta = new Meta<RoleMeta>(new RoleMeta("primary")) },
                     },
                     Links = new Links { Self = "/companies/7" },
                 },

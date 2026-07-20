@@ -27,9 +27,12 @@ public sealed record ResourceDocument<TAttributes> where TAttributes : class
 /// <see cref="Resource{TAttributes, TRelationships}"/>, so relationship access is by member
 /// rather than by name. Prefer this over <see cref="ResourceDocument{TAttributes}"/> whenever
 /// the resource's relationship names are known at compile time.</summary>
-public sealed record ResourceDocument<TAttributes, TRelationships>
+/// <typeparam name="TMeta">The document's meta shape. The spec reserves no meta member names, so
+/// this is entirely the endpoint's own: declare a record for what it actually sends.</typeparam>
+public record ResourceDocument<TAttributes, TRelationships, TMeta>
     where TAttributes : class
     where TRelationships : class
+    where TMeta : class
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public required Resource<TAttributes, TRelationships>? Data { get; init; }
@@ -38,5 +41,13 @@ public sealed record ResourceDocument<TAttributes, TRelationships>
 
     public Links? Links { get; init; }
 
-    public Meta? Meta { get; init; }
+    public TMeta? Meta { get; init; }
 }
+
+/// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>.
+/// C# has no default type arguments, so the default is spelled as a subtype; name TMeta
+/// explicitly to type the meta object too.</summary>
+public sealed record ResourceDocument<TAttributes, TRelationships>
+    : ResourceDocument<TAttributes, TRelationships, Meta>
+    where TAttributes : class
+    where TRelationships : class;

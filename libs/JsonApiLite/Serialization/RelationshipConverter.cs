@@ -24,6 +24,7 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
         ResourceIdentifier? one = null;
         List<ResourceIdentifier>? many = null;
         Links? links = null;
+        Meta? meta = null;
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
             var name = reader.GetString();
@@ -44,6 +45,9 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
                 case "links":
                     links = JsonSerializer.Deserialize<Links>(ref reader, options);
                     break;
+                case "meta":
+                    meta = JsonSerializer.Deserialize<Meta>(ref reader, options);
+                    break;
                 default:
                     reader.Skip();
                     break;
@@ -61,7 +65,7 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
             {
                 throw new JsonException("A relationship object must contain a 'data' or 'links' member.");
             }
-            return new LinksRelationship { Links = links };
+            return new LinksRelationship { Links = links, Meta = meta };
         }
         if (many is not null)
         {
@@ -71,7 +75,7 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
                     "The relationship's 'data' is an identifier array, but a to-one relationship " +
                     "(a single identifier or null) is declared here.");
             }
-            return new ToManyRelationship(many) { Links = links };
+            return new ToManyRelationship(many) { Links = links, Meta = meta };
         }
         if (typeToConvert == typeof(ToManyRelationship))
         {
@@ -79,7 +83,7 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
                 "The relationship's 'data' is a single identifier or null, but a to-many " +
                 "relationship (an identifier array) is declared here.");
         }
-        return new ToOneRelationship(one) { Links = links };
+        return new ToOneRelationship(one) { Links = links, Meta = meta };
     }
 
     public override void Write(Utf8JsonWriter writer, Relationship value, JsonSerializerOptions options)
@@ -105,6 +109,11 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
             {
                 writer.WriteNullValue();
             }
+        }
+        if (value.Meta is not null)
+        {
+            writer.WritePropertyName("meta");
+            JsonSerializer.Serialize(writer, value.Meta, options);
         }
         writer.WriteEndObject();
     }

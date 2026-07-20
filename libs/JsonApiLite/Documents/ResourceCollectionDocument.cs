@@ -16,10 +16,13 @@ public sealed record ResourceCollectionDocument<TAttributes> where TAttributes :
 }
 
 /// <summary>Collection document with the relationships typed as well; see
-/// <see cref="ResourceDocument{TAttributes, TRelationships}"/>.</summary>
-public sealed record ResourceCollectionDocument<TAttributes, TRelationships>
+/// <see cref="ResourceDocument{TAttributes, TRelationships, TMeta}"/>.</summary>
+/// <typeparam name="TMeta">The document's meta shape — on a list endpoint, usually where the
+/// page counts live. The spec names no meta members, so the shape is the endpoint's own.</typeparam>
+public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
     where TAttributes : class
     where TRelationships : class
+    where TMeta : class
 {
     public required IReadOnlyList<Resource<TAttributes, TRelationships>> Data { get; init; }
 
@@ -27,5 +30,12 @@ public sealed record ResourceCollectionDocument<TAttributes, TRelationships>
 
     public Links? Links { get; init; }
 
-    public Meta? Meta { get; init; }
+    public TMeta? Meta { get; init; }
 }
+
+/// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>;
+/// see <see cref="ResourceDocument{TAttributes, TRelationships}"/>.</summary>
+public sealed record ResourceCollectionDocument<TAttributes, TRelationships>
+    : ResourceCollectionDocument<TAttributes, TRelationships, Meta>
+    where TAttributes : class
+    where TRelationships : class;
