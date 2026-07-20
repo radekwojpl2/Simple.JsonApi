@@ -6,7 +6,7 @@ namespace JsonApiLite;
 /// the string exists exactly once and a typo is a compile error. The name is declared rather
 /// than derived, because spec type names ("contacts") are not mechanically recoverable from CLR
 /// type names (ContactAttributes).</summary>
-public interface IResourceType
+public interface IResourceType : IAttributes
 {
     /// <summary>The JSON:API resource type name, e.g. "contacts".</summary>
     static abstract string ResourceType { get; }

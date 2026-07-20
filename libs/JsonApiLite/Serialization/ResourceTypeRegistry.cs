@@ -11,8 +11,8 @@ public sealed class ResourceTypeRegistry
     private readonly Dictionary<string, Type> _resourceTypes = [];
 
     public ResourceTypeRegistry Map<TAttributes, TRelationships>(string type)
-        where TAttributes : class
-        where TRelationships : class
+        where TAttributes : class, IAttributes
+        where TRelationships : class, IRelationships
     {
         _resourceTypes[type] = typeof(Resource<TAttributes, TRelationships>);
         return this;
@@ -28,7 +28,7 @@ public sealed class ResourceTypeRegistry
     /// so the registry cannot drift from the declaration.</summary>
     public ResourceTypeRegistry Map<TAttributes, TRelationships>()
         where TAttributes : class, IResourceType
-        where TRelationships : class =>
+        where TRelationships : class, IRelationships =>
         Map<TAttributes, TRelationships>(TAttributes.ResourceType);
 
     /// <summary>Same for the dictionary-relationships flavor.</summary>

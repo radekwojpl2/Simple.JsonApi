@@ -20,9 +20,9 @@ public sealed record ResourceCollectionDocument<TAttributes> where TAttributes :
 /// <typeparam name="TMeta">The document's meta shape — on a list endpoint, usually where the
 /// page counts live. The spec names no meta members, so the shape is the endpoint's own.</typeparam>
 public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
-    where TAttributes : class
-    where TRelationships : class
-    where TMeta : class
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships
+    where TMeta : class, IMeta
 {
     public required IReadOnlyList<Resource<TAttributes, TRelationships>> Data { get; init; }
 
@@ -37,5 +37,5 @@ public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
 /// see <see cref="ResourceDocument{TAttributes, TRelationships}"/>.</summary>
 public sealed record ResourceCollectionDocument<TAttributes, TRelationships>
     : ResourceCollectionDocument<TAttributes, TRelationships, Meta>
-    where TAttributes : class
-    where TRelationships : class;
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships;

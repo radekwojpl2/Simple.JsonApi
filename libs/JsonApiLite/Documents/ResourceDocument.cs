@@ -30,9 +30,9 @@ public sealed record ResourceDocument<TAttributes> where TAttributes : class
 /// <typeparam name="TMeta">The document's meta shape. The spec reserves no meta member names, so
 /// this is entirely the endpoint's own: declare a record for what it actually sends.</typeparam>
 public record ResourceDocument<TAttributes, TRelationships, TMeta>
-    where TAttributes : class
-    where TRelationships : class
-    where TMeta : class
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships
+    where TMeta : class, IMeta
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public required Resource<TAttributes, TRelationships>? Data { get; init; }
@@ -49,5 +49,5 @@ public record ResourceDocument<TAttributes, TRelationships, TMeta>
 /// explicitly to type the meta object too.</summary>
 public sealed record ResourceDocument<TAttributes, TRelationships>
     : ResourceDocument<TAttributes, TRelationships, Meta>
-    where TAttributes : class
-    where TRelationships : class;
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships;

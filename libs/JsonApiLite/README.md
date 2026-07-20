@@ -12,12 +12,16 @@ public sealed record ContactAttributes(string? FirstName, string? LastName) : IR
     public static string ResourceType => "contacts";   // declared once, referenced by type
 }
 
-public sealed record ContactRelationships
+public sealed record ContactRelationships : IRelationships
 {
     public ToOneRelationship? Company { get; init; }
     public ToManyRelationship? Tags { get; init; }
 }
 ```
+
+`IAttributes`, `IRelationships` and `IMeta` are empty markers that keep unrelated types out of
+those positions. `IResourceType` extends `IAttributes`, so an attributes record that declares its
+type name already satisfies it; implement `IAttributes` directly on one that does not.
 
 ## Writing and reading
 
@@ -71,7 +75,7 @@ The spec reserves no meta member names — meta is as user-defined as `attribute
 typed in advance. Documents take the shape as a type parameter:
 
 ```csharp
-public sealed record PageMeta(int? Total, string? GeneratedAt);
+public sealed record PageMeta(int? Total, string? GeneratedAt) : IMeta;
 
 new ResourceCollectionDocument<ContactAttributes, ContactRelationships, PageMeta>
 {
@@ -103,9 +107,11 @@ Document meta cannot be typed on the dictionary-relationship document either:
 
 ## Tests as documentation
 
-`libs/tests/JsonApiLite.Tests` (74 tests): `Serialization`/`Deserialization` pin single features
-to exact wire JSON; `TypedRelationships`, `OptionalAttribute`, `SpecCompliance` cover their
-namesakes; `RichDocument` → `CompoundDocument` → `RequestResponseScenario` climb from full
-documents to whole client↔server cycles. Valid documents are built as objects and round-tripped
+`libs/tests/JsonApiLite.Tests` (74 tests) mirrors the source folders where a subject has its own
+file: `Serialization/` pins single features to exact wire JSON, `Documents/` climbs from rich
+single documents to compound ones, `Relationships/` covers both arities. What is left sits at the
+root because it cuts across folders, as `Optional` and `JsonApiMediaType` do in the source:
+`OptionalAttribute`, `SpecCompliance`, and `RequestResponseScenario` whole client↔server cycles.
+Valid documents are built as objects and round-tripped
 (`Wire.Roundtrip`); raw JSON appears only as expected output (wire pins) or `JsonObject`-built
 protocol violations. Method names are the spec, bodies the proof.

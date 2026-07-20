@@ -28,7 +28,7 @@ public abstract record Resource
         string? id = null, TAttributes? attributes = null, TRelationships? relationships = null,
         Links? links = null)
         where TAttributes : class, IResourceType
-        where TRelationships : class =>
+        where TRelationships : class, IRelationships =>
         new()
         {
             Type = TAttributes.ResourceType,
@@ -61,6 +61,10 @@ public abstract record Resource
 /// carried no attributes member (in an update, that means every attribute keeps its current
 /// value). A relationship absent from <see cref="Relationships"/> likewise keeps its current
 /// value — presence with null data is how a to-one relationship is cleared.</summary>
+/// <remarks><typeparamref name="TAttributes"/> is deliberately not held to
+/// <see cref="IAttributes"/> here: this is the form <c>included</c> reads back into as
+/// <c>Resource&lt;JsonObject&gt;</c>, and a BCL type cannot implement the marker. The fully typed
+/// <see cref="Resource{TAttributes, TRelationships}"/> does hold both markers.</remarks>
 public sealed record Resource<TAttributes> : Resource where TAttributes : class
 {
     [JsonPropertyOrder(1)]
@@ -112,8 +116,8 @@ public sealed record Resource<TAttributes> : Resource where TAttributes : class
 /// type also drives read-side arity checking: an identifier array arriving where a
 /// <see cref="ToOneRelationship"/> is declared is rejected as malformed JSON.</summary>
 public sealed record Resource<TAttributes, TRelationships> : Resource
-    where TAttributes : class
-    where TRelationships : class
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships
 {
     [JsonPropertyOrder(1)]
     public TAttributes? Attributes { get; init; }

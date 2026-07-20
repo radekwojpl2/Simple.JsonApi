@@ -11,7 +11,7 @@ namespace JsonApiLite;
 /// cascade into <see cref="Links"/> and everything holding one; documents, which have no such
 /// problem, take the meta type as a parameter of their own instead.</summary>
 [JsonConverter(typeof(MetaConverter))]
-public record Meta
+public record Meta : IMeta
 {
     /// <summary>The members as they stand on the wire — what a server sent, whether or not any
     /// declared type describes it.</summary>
@@ -33,7 +33,7 @@ public record Meta
 /// The value is written as its own members, so the wire is identical to having built the object
 /// by hand. Reading gives back the base <see cref="Meta"/> — the wire carries no type name —
 /// so recover the shape with <see cref="Meta.As{T}"/>.</summary>
-public sealed record Meta<TMeta> : Meta where TMeta : class
+public sealed record Meta<TMeta> : Meta where TMeta : class, IMeta
 {
     public Meta(TMeta value, JsonSerializerOptions? options = null)
     {
