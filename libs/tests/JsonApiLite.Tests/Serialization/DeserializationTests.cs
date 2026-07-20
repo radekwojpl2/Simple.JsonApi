@@ -121,25 +121,21 @@ public class DeserializationTests
     }
 
     [Fact]
-    public void A_relationship_without_data_or_links_is_rejected()
+    public void A_relationship_with_none_of_data_links_or_meta_is_rejected()
     {
+        // The spec requires at least one of the three; meta alone is enough, so the empty object
+        // is the only rejectable form.
         var body = new JsonObject
         {
             ["data"] = new JsonObject
             {
                 ["type"] = "contacts",
-                ["relationships"] = new JsonObject
-                {
-                    ["company"] = new JsonObject
-                    {
-                        ["meta"] = new JsonObject { ["note"] = "x" },
-                    },
-                },
+                ["relationships"] = new JsonObject { ["company"] = new JsonObject() },
             },
         };
 
         var exception = Assert.ThrowsAny<JsonException>(() => Parse(body));
-        Assert.Contains("'data'", exception.Message);
+        Assert.Contains("'meta'", exception.Message);
     }
 
     [Fact]

@@ -21,6 +21,11 @@ public abstract record Resource
     [JsonPropertyOrder(3)]
     public Links? Links { get; init; }
 
+    /// <summary>Resource-level meta — non-standard information about the resource itself, as
+    /// opposed to its attributes.</summary>
+    [JsonPropertyOrder(4)]
+    public Meta? Meta { get; init; }
+
     /// <summary>A fully typed resource with <see cref="Type"/> filled from the attributes type's
     /// <see cref="IResourceType"/> declaration. The object-initializer form stays available for
     /// attribute types that do not declare a resource type name.</summary>

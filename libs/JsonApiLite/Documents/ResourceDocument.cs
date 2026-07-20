@@ -21,6 +21,8 @@ public sealed record ResourceDocument<TAttributes> where TAttributes : class
     public Links? Links { get; init; }
 
     public Meta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }
 
 /// <summary>Single-resource document with the relationships typed as well: the resource is a
@@ -42,6 +44,8 @@ public record ResourceDocument<TAttributes, TRelationships, TMeta>
     public Links? Links { get; init; }
 
     public TMeta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }
 
 /// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>.

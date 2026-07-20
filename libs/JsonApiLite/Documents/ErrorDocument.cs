@@ -5,4 +5,10 @@ namespace JsonApiLite;
 public sealed record ErrorDocument
 {
     public required IReadOnlyList<Error> Errors { get; init; }
+
+    public Links? Links { get; init; }
+
+    public Meta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }

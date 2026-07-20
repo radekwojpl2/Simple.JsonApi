@@ -67,6 +67,7 @@ explicit null never matters.
   what `included` reads back as (`Resource<JsonObject>`), unless a `ResourceTypeRegistry` via
   `JsonApiSerializer.CreateOptions(...)` maps types to concrete resources.
 - `LinksRelationship` — spec-valid links-only relationship (reading other servers' responses).
+- `JsonApiObject` — the top-level `jsonapi` member: `version`, `ext`, `profile`, `meta`.
 - Media type: `JsonApiMediaType.Value`.
 
 ## Typed meta
@@ -107,7 +108,7 @@ Document meta cannot be typed on the dictionary-relationship document either:
 
 ## Tests as documentation
 
-`libs/tests/JsonApiLite.Tests` (74 tests) mirrors the source folders where a subject has its own
+`libs/tests/JsonApiLite.Tests` (76 tests) mirrors the source folders where a subject has its own
 file: `Serialization/` pins single features to exact wire JSON, `Documents/` climbs from rich
 single documents to compound ones, `Relationships/` covers both arities. What is left sits at the
 root because it cuts across folders, as `Optional` and `JsonApiMediaType` do in the source:

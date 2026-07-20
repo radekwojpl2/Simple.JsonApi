@@ -159,7 +159,8 @@ public class SpecComplianceTests
     {
         var wire = JsonApiSerializer.Serialize(new ResourceDocument<ContactAttributes, ContactRelationships>
         {
-            Data = new Resource<ContactAttributes, ContactRelationships> { Type = ContactAttributes.ResourceType, Id = "1" },
+            Data = new Resource<ContactAttributes, ContactRelationships>
+                { Type = ContactAttributes.ResourceType, Id = "1" },
             Included =
             [
                 new Resource<CompanyAttributes, CompanyRelationships>
@@ -169,11 +170,15 @@ public class SpecComplianceTests
                     Attributes = new CompanyAttributes("Acme"),
                     Relationships = new CompanyRelationships
                     {
-                        Owner = Relationship.ToOne<UserAttributes>("9") with { Meta = new Meta<RoleMeta>(new RoleMeta("primary")) },
+                        Owner = Relationship.ToOne<UserAttributes>("9") with
+                        {
+                            Meta = new Meta<RoleMeta>(new RoleMeta("primary"))
+                        },
                     },
                     Links = new Links { Self = "/companies/7" },
                 },
-                new Resource<TagAttributes> { Type = TagAttributes.ResourceType, Id = "3", Attributes = new TagAttributes("vip") },
+                new Resource<TagAttributes>
+                    { Type = TagAttributes.ResourceType, Id = "3", Attributes = new TagAttributes("vip") },
             ],
         });
 
@@ -213,6 +218,65 @@ public class SpecComplianceTests
 
         Assert.Contains("Acme", json);
         Assert.Contains("Attributes", json);
+    }
+
+    [Fact]
+    public void Meta_survives_in_every_position_the_spec_allows_it()
+    {
+        var document = new ResourceDocument<ContactAttributes, ContactRelationships>
+        {
+            Data = new Resource<ContactAttributes, ContactRelationships>
+            {
+                Type = ContactAttributes.ResourceType,
+                Id = "1",
+                Relationships = new ContactRelationships
+                {
+                    Company = new ToOneRelationship(
+                        ResourceIdentifier.Of<CompanyAttributes>("7") with
+                        {
+                            Meta = new Meta<OriginMeta>(new OriginMeta("identifier")),
+                        })
+                    {
+                        Meta = new Meta<OriginMeta>(new OriginMeta("relationship")),
+                    },
+                },
+                Meta = new Meta<OriginMeta>(new OriginMeta("resource")),
+            },
+            Meta = new Meta<OriginMeta>(new OriginMeta("document")),
+            JsonApi = new JsonApiObject
+            {
+                Version = "1.1",
+                Meta = new Meta<OriginMeta>(new OriginMeta("jsonapi")),
+            },
+        };
+
+        var reread = Wire.Roundtrip(document);
+
+        var company = reread.Data!.Relationships!.Company!;
+        Assert.Equal(new OriginMeta("identifier"), company.Data!.Meta!.As<OriginMeta>());
+        Assert.Equal(new OriginMeta("relationship"), company.Meta!.As<OriginMeta>());
+        Assert.Equal(new OriginMeta("resource"), reread.Data.Meta!.As<OriginMeta>());
+        Assert.Equal(new OriginMeta("document"), reread.Meta!.As<OriginMeta>());
+        Assert.Equal(new OriginMeta("jsonapi"), reread.JsonApi!.Meta!.As<OriginMeta>());
+        Assert.Equal("1.1", reread.JsonApi.Version);
+    }
+
+    [Fact]
+    public void A_meta_only_relationship_is_valid()
+    {
+        var wire = """
+                   {"data":{"type":"contacts","id":"1","relationships":{
+                   "company":{"meta":{"belongsTo":"relationship"}}}}}
+                   """;
+
+        var document = JsonApiSerializer.Deserialize<ResourceDocument<ContactAttributes>>(wire)!;
+
+        var company = Assert.IsType<LinksRelationship>(document.Data!.Relationships!["company"]);
+        Assert.Null(company.Links);
+        Assert.Equal(new OriginMeta("relationship"), company.Meta!.As<OriginMeta>());
+        Assert.Equal(
+            """{"data":{"type":"contacts","id":"1","relationships":{"company":{"meta":{"belongsTo":"relationship"}}}}}""",
+            JsonApiSerializer.Serialize(document));
     }
 
     private static ResourceDocument<ContactAttributes> ContactWithLinksOnlyCompany() =>

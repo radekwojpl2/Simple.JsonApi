@@ -61,9 +61,10 @@ internal sealed class RelationshipConverter : JsonConverter<Relationship>
                 throw new JsonException(
                     "A relationship declared to carry resource linkage must contain a 'data' member.");
             }
-            if (links is null)
+            if (links is null && meta is null)
             {
-                throw new JsonException("A relationship object must contain a 'data' or 'links' member.");
+                throw new JsonException(
+                    "A relationship object must contain a 'data', 'links' or 'meta' member.");
             }
             return new LinksRelationship { Links = links, Meta = meta };
         }

@@ -12,4 +12,8 @@ public sealed record ToOneLinkageDocument
     public required ResourceIdentifier? Data { get; init; }
 
     public Links? Links { get; init; }
+
+    public Meta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }

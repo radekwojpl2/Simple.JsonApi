@@ -7,4 +7,8 @@ public sealed record ToManyLinkageDocument
     public required IReadOnlyList<ResourceIdentifier> Data { get; init; }
 
     public Links? Links { get; init; }
+
+    public Meta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }

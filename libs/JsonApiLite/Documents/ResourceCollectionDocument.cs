@@ -13,6 +13,8 @@ public sealed record ResourceCollectionDocument<TAttributes> where TAttributes :
     public Links? Links { get; init; }
 
     public Meta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }
 
 /// <summary>Collection document with the relationships typed as well; see
@@ -31,6 +33,8 @@ public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
     public Links? Links { get; init; }
 
     public TMeta? Meta { get; init; }
+
+    public JsonApiObject? JsonApi { get; init; }
 }
 
 /// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>;
