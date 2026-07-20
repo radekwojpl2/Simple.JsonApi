@@ -8,8 +8,6 @@ on:
 
 jobs:
   build-and-test:
-    # ubuntu runners ship with Docker, which the integration tests need: they start a
-    # PostgreSQL container per run via Testcontainers.
     runs-on: ubuntu-latest
 
     steps:
@@ -21,16 +19,16 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore JsonApiPoc.sln
+        run: dotnet restore JsonApiLite.sln
 
       - name: Build
-        run: dotnet build JsonApiPoc.sln --no-restore --configuration Release
+        run: dotnet build JsonApiLite.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test JsonApiPoc.sln --no-build --configuration Release --verbosity normal
+        run: dotnet test JsonApiLite.sln --no-build --configuration Release --verbosity normal
 
       - name: Check for vulnerable packages
-        run: dotnet list JsonApiPoc.sln package --vulnerable --include-transitive
+        run: dotnet list JsonApiLite.sln package --vulnerable --include-transitive
 
   publish-preview:
     # Every pull request to main also ships a preview of the packages to nuget.org, so the
@@ -65,22 +63,18 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Restore
-        run: dotnet restore JsonApiPoc.sln
+        run: dotnet restore JsonApiLite.sln
 
       - name: Build
-        run: dotnet build JsonApiPoc.sln --no-restore --configuration Release
+        run: dotnet build JsonApiLite.sln --no-restore --configuration Release
 
       - name: Pack
         run: |
-          for project in libs/JsonApiKit/JsonApiKit.csproj \
-                         libs/JsonApiKit.OpenApi/JsonApiKit.OpenApi.csproj \
-                         libs/JsonApiKit.Testing/JsonApiKit.Testing.csproj; do
-            dotnet pack "$project" \
-              --no-build \
-              --configuration Release \
-              -p:Version=${{ steps.version.outputs.version }} \
-              --output ./artifacts
-          done
+          dotnet pack libs/JsonApiLite/JsonApiLite.csproj \
+            --no-build \
+            --configuration Release \
+            -p:Version=${{ steps.version.outputs.version }} \
+            --output ./artifacts
 
       - name: NuGet login (OIDC -> temp API key)
         uses: NuGet/login@v1
@@ -105,15 +99,13 @@ jobs:
           MARKER="<!-- preview-packages -->"
           BODY=$(printf '%s\n' \
             "$MARKER" \
-            "📦 Preview packages published to nuget.org as **$VERSION**:" \
+            "📦 Preview package published to nuget.org as **$VERSION**:" \
             "" \
             '```' \
             "dotnet add package Simple.JsonApi --version $VERSION" \
-            "dotnet add package Simple.JsonApi.OpenApi --version $VERSION" \
-            "dotnet add package Simple.JsonApi.Testing --version $VERSION" \
             '```' \
             "" \
-            "_Packages can take a few minutes to appear while nuget.org validates and indexes them._")
+            "_The package can take a few minutes to appear while nuget.org validates and indexes it._")
           COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
             --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
           if [ -n "$COMMENT_ID" ]; then

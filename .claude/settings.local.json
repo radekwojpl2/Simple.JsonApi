@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(dotnet add *)",
-      "PowerShell(dotnet run *)"
+      "PowerShell(dotnet run *)",
+      "WebSearch"
     ]
   }
 }

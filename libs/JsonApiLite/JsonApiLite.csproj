@@ -4,7 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The assembly stays JsonApiLite; only the nuget.org listing is Simple.JsonApi,
+         because the JsonApiKit/JsonApiLite ids are taken. -->
+    <PackageId>Simple.JsonApi</PackageId>
     <Description>Minimal, strongly typed JSON:API (https://jsonapi.org/format/) request and response documents on System.Text.Json. No framework coupling, no validation pipeline — just the wire model.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>
