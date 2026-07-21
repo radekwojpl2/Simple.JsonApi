@@ -1,7 +1,8 @@
 # JsonApiLite
 
 Minimal, strongly typed [JSON:API](https://jsonapi.org/format/) request/response documents on
-System.Text.Json. No framework coupling, no validation pipeline — just the wire model. Malformed
+System.Text.Json, for net8.0 and net10.0. No framework coupling, no validation pipeline — just
+the wire model. Malformed
 input throws `JsonException`; the HTTP status is the caller's call.
 
 ## Declaring a resource
