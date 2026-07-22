@@ -28,6 +28,10 @@ public sealed record ContactRelationships : IRelationships
 }
 ```
 
+`IAttributes`, `IRelationships` and `IMeta` are empty markers. `IResourceType` extends
+`IAttributes`, so an attributes record that declares its type name already satisfies it;
+implement `IAttributes` directly on one that does not.
+
 ## Write a document
 
 ```csharp
@@ -73,8 +77,16 @@ ResourceIdentifier? company = received.Data.Relationships!.Company!.Data;
 
 ## The tri-state
 
-In a write, *absent*, *null* and *a value* mean three different things. Relationships carry this
-distinction natively:
+In a write, *absent*, *null* and *a value* mean three different things:
+
+| Wire | Relationship member | `Optional<T>` attribute | Meaning |
+| --- | --- | --- | --- |
+| member absent | `Company == null` | `Title.IsSet == false` | keep current value |
+| `null` / `{"data":null}` | `Company.Data == null` | `IsSet == true, Value == null` | clear it |
+| a value | `Company.Data` = identifier | `IsSet == true, Value` = value | set it |
+
+`data` is always written, never dropped by null-omission; null members are always omitted. For
+to-many, `"data": []` replaces the set with nothing. Relationships carry the distinction natively:
 
 ```csharp
 new ContactRelationships
@@ -190,6 +202,27 @@ var problem = new ErrorDocument
 JsonApiMediaType.Value   // "application/vnd.api+json"
 ```
 
+## Also in the box
+
+- `Resource<TAttributes>` — relationships keyed by name, the escape hatch when they are not known
+  at compile time, with `ToOne(name)` / `ToMany(name)` lookups. Also what `included` reads back as
+  (`Resource<JsonObject>`) without a registry.
+- `LinksRelationship` — a relationship carrying links or meta but no linkage, which servers emit
+  when the linkage itself is not included.
+- `JsonApiObject` — the top-level `jsonapi` member: `version`, `ext`, `profile`, `meta`.
+- `Link` — a bare URI string, or `{href, meta}` when it carries meta.
+- `Meta.Members` — the members as sent, for meta you have no declared type for.
+
+## Tests as documentation
+
+`libs/tests/JsonApiLite.Tests` (76 tests) mirrors the source folders where a subject owns a file:
+`Serialization/` pins single features to exact wire JSON, `Documents/` climbs from rich single
+documents to compound ones, `Relationships/` covers both arities. Cross-cutting files sit at the
+root, as `Optional` and `JsonApiMediaType` do in the source: `OptionalAttribute`,
+`SpecCompliance`, and `RequestResponseScenario` whole client↔server cycles. Valid documents are
+built as objects and round-tripped; raw JSON appears only as expected output or as
+`JsonObject`-built protocol violations. Method names are the spec, bodies the proof.
+
 ## Where this does not cover the specification
 
 The library models documents. Everything the spec says about *transport* is out of scope by
@@ -223,8 +256,3 @@ design, and a few document-level features are genuinely missing.
   cannot exist alongside `ResourceDocument<TAttributes, TRelationships>`, because C# identifies a
   generic type by name and arity alone — constraints are not part of that identity. Use
   `ResourceDocument<TAttributes, TRelationships, TMeta>`.
-
-## Library reference
-
-Deeper notes on the tri-state, typed meta and the test suite live in
-[`libs/JsonApiLite/README.md`](libs/JsonApiLite/README.md), which is also the package readme.
