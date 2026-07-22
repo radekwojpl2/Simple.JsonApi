@@ -9,9 +9,15 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the preview version is derived from the latest v* tag
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -32,33 +38,12 @@ jobs:
       - name: Check for vulnerable packages
         run: dotnet list JsonApiLite.sln package --vulnerable --include-transitive
 
-  publish-preview:
-    # Every pull request to main also ships a preview of the packages to nuget.org, so the
-    # branch's changes can be consumed before the merge. The version comes from the latest
-    # release tag with the patch bumped and a -preview.<pr>.<run> suffix — semantic-release
-    # is not involved; it only versions real releases from main.
-    if: github.event_name == 'pull_request'
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # a job-level permissions block drops everything unlisted, checkout included
-      id-token: write # enable GitHub OIDC token issuance for NuGet Trusted Publishing
-      pull-requests: write # comment the published preview version on the PR
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # the preview version is derived from the latest v* tag
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-
+      # The preview package is built here rather than in publish-preview, because restore,
+      # build and pack all execute MSBuild targets — from this branch and from every restored
+      # package — and the job that holds the publishing credential must never run them.
       - name: Compute preview version
         id: version
+        if: github.event_name == 'pull_request'
         run: |
           BASE=$(git describe --tags --abbrev=0 --match 'v*' | sed 's/^v//')
           IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
@@ -66,19 +51,51 @@ jobs:
           echo "Preview version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Restore
-        run: dotnet restore JsonApiLite.sln
-
-      - name: Build
-        run: dotnet build JsonApiLite.sln --no-restore --configuration Release
-
       - name: Pack
+        if: github.event_name == 'pull_request'
         run: |
           dotnet pack libs/JsonApiLite/JsonApiLite.csproj \
             --no-build \
             --configuration Release \
             -p:Version=${{ steps.version.outputs.version }} \
             --output ./artifacts
+
+      - name: Upload preview package
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-package
+          path: ./artifacts/*.nupkg
+          if-no-files-found: error
+
+  publish-preview:
+    # Every pull request to main also ships a preview of the package to nuget.org, so the
+    # branch's changes can be consumed before the merge. The version comes from the latest
+    # release tag with the patch bumped and a -preview.<pr>.<run> suffix — semantic-release
+    # is not involved; it only versions real releases from main.
+    #
+    # This job holds the OIDC credential, so it neither checks out nor builds the branch: it
+    # downloads the package built by build-and-test and pushes it. 'dotnet nuget push' runs
+    # no project code, so nothing from the pull request executes next to the credential.
+    if: github.event_name == 'pull_request'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # a job-level permissions block drops everything unlisted
+      id-token: write # enable GitHub OIDC token issuance for NuGet Trusted Publishing
+      pull-requests: write # comment the published preview version on the PR
+
+    steps:
+      - name: Download preview package
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-package
+          path: ./artifacts
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: NuGet login (OIDC -> temp API key)
         uses: NuGet/login@v1
@@ -98,7 +115,7 @@ jobs:
       - name: Comment published version on the PR
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build-and-test.outputs.version }}
         run: |
           MARKER="<!-- preview-packages -->"
           BODY=$(printf '%s\n' \
