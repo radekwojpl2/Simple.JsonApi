@@ -223,6 +223,19 @@ root, as `Optional` and `JsonApiMediaType` do in the source: `OptionalAttribute`
 built as objects and round-tripped; raw JSON appears only as expected output or as
 `JsonObject`-built protocol violations. Method names are the spec, bodies the proof.
 
+## A sample that consumes the package
+
+[`JsonApiPoc.Api`](JsonApiPoc.Api) is a minimal API over in-memory mock data, referencing
+`Simple.JsonApi` from nuget.org rather than the source next to it — the library is exercised the
+way an outside caller would. It covers a collection with pagination links and meta, a single
+resource with `include`, create returning 201 and a `Location`, a PATCH demonstrating the
+tri-state, delete, the relationship and related endpoints, and 404/422 as error documents.
+`JsonApi.cs` is the entire ASP.NET seam, since the library models documents and not HTTP.
+
+It is a demonstration, not a reference implementation: storage is a static list, `include` accepts
+one value, query parameters are hand-parsed, there is no content negotiation and no auth, and
+nothing is tested. Read it for endpoint shapes, not for anything to run.
+
 ## Where this does not cover the specification
 
 The library models documents. Everything the spec says about *transport* is out of scope by
