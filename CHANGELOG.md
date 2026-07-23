@@ -1,3 +1,40 @@
+# [1.0.0](https://github.com/radekwojpl2/json-api-format-poc/compare/v0.1.1...v1.0.0) (2026-07-23)
+
+
+* feat!: drop the PoC app and JsonApiKit, ship JsonApiLite alone ([ec13b26](https://github.com/radekwojpl2/json-api-format-poc/commit/ec13b269c2ae1411bf3bbfa2476f047590e9f2f3))
+* feat!: hold the type parameters to marker interfaces ([7dd0026](https://github.com/radekwojpl2/json-api-format-poc/commit/7dd00263af4696464c132ba4b4e96a1f54cfbd06))
+* feat!: type every meta position ([a3aa78f](https://github.com/radekwojpl2/json-api-format-poc/commit/a3aa78fe522794acc1e4c279fc2f0c2ac30da10f))
+
+
+### Bug Fixes
+
+* carry meta everywhere the spec allows it ([60d42f1](https://github.com/radekwojpl2/json-api-format-poc/commit/60d42f1af7fa1b74775080b64e06bd51f2d64419))
+
+
+### Features
+
+* add JsonApiLite, a minimal strongly typed JSON:API document library ([b613241](https://github.com/radekwojpl2/json-api-format-poc/commit/b613241da019498e68e82773d6ebbb465fc00392))
+* target net8.0 alongside net10.0 ([fdbe7b9](https://github.com/radekwojpl2/json-api-format-poc/commit/fdbe7b90d382e77724b713743d0f3316e1a46185))
+
+
+### BREAKING CHANGES
+
+* relationships records must implement IRelationships and
+meta records IMeta; attributes records implementing IResourceType need
+no change.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+* Meta no longer has Total, PageCount or Additional —
+declare the shape and use Meta<T> or the document's TMeta parameter.
+Link.Meta and Error.Meta are Meta rather than JsonObject.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+* the Simple.JsonApi.OpenApi and Simple.JsonApi.Testing
+packages are no longer built or published, and Simple.JsonApi now ships
+JsonApiLite instead of JsonApiKit.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
 ## [0.1.1](https://github.com/radekwojpl2/json-api-format-poc/compare/v0.1.0...v0.1.1) (2026-07-15)
 
 
