@@ -11,7 +11,7 @@
              the way an outside caller would. The scaffold's OpenApi reference is gone: these
              endpoints write JSON:API text directly, so it described nothing, and it dragged in
              Microsoft.OpenApi 2.0.0 (NU1903, high severity). -->
-        <PackageReference Include="Simple.JsonApi" Version="0.1.2-preview.2.25"/>
+        <PackageReference Include="Simple.JsonApi" Version="1.0.0"/>
     </ItemGroup>
 
 </Project>

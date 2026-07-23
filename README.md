@@ -269,3 +269,7 @@ design, and a few document-level features are genuinely missing.
   cannot exist alongside `ResourceDocument<TAttributes, TRelationships>`, because C# identifies a
   generic type by name and arity alone — constraints are not part of that identity. Use
   `ResourceDocument<TAttributes, TRelationships, TMeta>`.
+
+## License
+
+[MIT](LICENSE).
