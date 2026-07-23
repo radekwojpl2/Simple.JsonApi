@@ -13,8 +13,8 @@
     <Copyright>Copyright (c) 2026 Radosław Bajor</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/radekwojpl2/json-api-format-poc</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/radekwojpl2/json-api-format-poc</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/radekwojpl2/Simple.JsonApi</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/radekwojpl2/Simple.JsonApi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
