@@ -15,8 +15,6 @@ permissions:
 
 jobs:
   build:
-    # ubuntu runners ship with Docker, which the integration tests need: they start a
-    # PostgreSQL container per run via Testcontainers.
     runs-on: ubuntu-latest
 
     steps:
@@ -25,16 +23,18 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
-        run: dotnet restore JsonApiPoc.sln
+        run: dotnet restore JsonApiLite.sln
 
       - name: Build
-        run: dotnet build JsonApiPoc.sln --no-restore --configuration Release
+        run: dotnet build JsonApiLite.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test JsonApiPoc.sln --no-build --configuration Release --verbosity normal
+        run: dotnet test JsonApiLite.sln --no-build --configuration Release --verbosity normal
 
   semantic-release:
     needs: build
@@ -75,33 +75,19 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
-        run: dotnet restore JsonApiPoc.sln
+        run: dotnet restore JsonApiLite.sln
 
       - name: Build
-        run: dotnet build JsonApiPoc.sln --no-restore --configuration Release
+        run: dotnet build JsonApiLite.sln --no-restore --configuration Release
 
-      - name: Pack JsonApiKit
+      - name: Pack JsonApiLite
         run: |
-          dotnet pack libs/JsonApiKit/JsonApiKit.csproj \
-            --no-build \
-            --configuration Release \
-            -p:Version=${{ needs.semantic-release.outputs.new_release_version }} \
-            --output ./artifacts
-
-      - name: Pack JsonApiKit.OpenApi
-        run: |
-          dotnet pack libs/JsonApiKit.OpenApi/JsonApiKit.OpenApi.csproj \
-            --no-build \
-            --configuration Release \
-            -p:Version=${{ needs.semantic-release.outputs.new_release_version }} \
-            --output ./artifacts
-
-      - name: Pack JsonApiKit.Testing
-        run: |
-          dotnet pack libs/JsonApiKit.Testing/JsonApiKit.Testing.csproj \
+          dotnet pack libs/JsonApiLite/JsonApiLite.csproj \
             --no-build \
             --configuration Release \
             -p:Version=${{ needs.semantic-release.outputs.new_release_version }} \
@@ -123,7 +109,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

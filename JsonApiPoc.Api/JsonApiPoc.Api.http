@@ -1,0 +1,77 @@
+@host = http://localhost:5246
+@json = application/vnd.api+json
+
+### List, paged. Links and a declared meta shape come back alongside the data.
+GET {{host}}/contacts?pageNumber=1&pageSize=2
+Accept: {{json}}
+
+### One resource, with its company sideloaded into 'included'.
+GET {{host}}/contacts/2?include=company
+Accept: {{json}}
+
+### Create. No id — the server assigns one and answers 201 with a Location header.
+POST {{host}}/contacts
+Content-Type: {{json}}
+
+{
+  "data": {
+    "type": "contacts",
+    "attributes": { "firstName": "Edsger", "lastName": "Dijkstra" },
+    "relationships": { "company": { "data": { "type": "companies", "id": "8" } } }
+  }
+}
+
+### Create, rejected: 422 with a JSON Pointer at the offending member.
+POST {{host}}/contacts
+Content-Type: {{json}}
+
+{
+  "data": { "type": "contacts", "attributes": { "lastName": "NoFirstName" } }
+}
+
+### Update, the tri-state in one body: lastName is absent so it survives, email is explicitly
+### null so it is cleared, and company carries null data so the relationship is emptied.
+PATCH {{host}}/contacts/1
+Content-Type: {{json}}
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "1",
+    "attributes": { "email": null },
+    "relationships": { "company": { "data": null } }
+  }
+}
+
+### Replace the whole tag set. An empty array would remove every member.
+PATCH {{host}}/contacts/1
+Content-Type: {{json}}
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "1",
+    "relationships": { "tags": { "data": [{ "type": "tags", "id": "9" }] } }
+  }
+}
+
+### Linkage only.
+GET {{host}}/contacts/2/relationships/company
+Accept: {{json}}
+
+### Repoint the relationship; send "data": null to clear it instead.
+PATCH {{host}}/contacts/2/relationships/company
+Content-Type: {{json}}
+
+{ "data": { "type": "companies", "id": "8" } }
+
+### The related resource itself, rather than its linkage.
+GET {{host}}/contacts/2/company
+Accept: {{json}}
+
+### Delete: 204, no body.
+DELETE {{host}}/contacts/3
+
+### Missing resource: 404 as a JSON:API error document.
+GET {{host}}/contacts/999
+Accept: {{json}}

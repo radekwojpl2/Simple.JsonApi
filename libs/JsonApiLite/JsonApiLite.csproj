@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- The assembly stays JsonApiLite; only the nuget.org listing is Simple.JsonApi,
+         because the JsonApiKit/JsonApiLite ids are taken. -->
+    <PackageId>Simple.JsonApi</PackageId>
+    <Description>Minimal, strongly typed JSON:API (https://jsonapi.org/format/) request and response documents on System.Text.Json. No framework coupling, no validation pipeline — just the wire model.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The repository readme is the package readme; there is only one. -->
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
