@@ -7,13 +7,21 @@
     <!-- The assembly stays JsonApiLite; only the nuget.org listing is Simple.JsonApi,
          because the JsonApiKit/JsonApiLite ids are taken. -->
     <PackageId>Simple.JsonApi</PackageId>
+    <Authors>Radosław Bajor</Authors>
     <Description>Minimal, strongly typed JSON:API (https://jsonapi.org/format/) request and response documents on System.Text.Json. No framework coupling, no validation pipeline — just the wire model.</Description>
+    <PackageTags>json-api;jsonapi;json:api;serialization;system.text.json;rest;api</PackageTags>
+    <Copyright>Copyright (c) 2026 Radosław Bajor</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/radekwojpl2/json-api-format-poc</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/radekwojpl2/json-api-format-poc</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The repository readme is the package readme; there is only one. -->
+    <!-- The repository readme and license travel with the package. -->
     <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
