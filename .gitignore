@@ -6,6 +6,11 @@
 *.user
 *.sln.docstates
 
+# IDE and tool-local settings
+.idea/
+.vs/
+.claude/settings.local.json
+
 # Build results
 
 [Dd]ebug/
