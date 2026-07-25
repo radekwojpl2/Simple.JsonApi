@@ -7,11 +7,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- The published package, not a project reference: this sample consumes JsonApiLite
-             the way an outside caller would. The scaffold's OpenApi reference is gone: these
-             endpoints write JSON:API text directly, so it described nothing, and it dragged in
-             Microsoft.OpenApi 2.0.0 (NU1903, high severity). -->
-        <PackageReference Include="Simple.JsonApi" Version="1.0.0"/>
+        <!-- Simple.JsonApi.OpenApi is not published yet, so it comes from the repository and pulls
+             JsonApiLite in with it. Once it ships, both go back to a PackageReference — the sample
+             is meant to consume the libraries the way an outside caller would. -->
+        <ProjectReference Include="../libs/JsonApiLite.OpenApi/JsonApiLite.OpenApi.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Program.cs calls AddOpenApi/MapOpenApi directly, so the app names that package itself
+             rather than leaning on the transitive reference. The Microsoft.OpenApi pin that used to
+             live here now sits in JsonApiLite.OpenApi, which is what puts it on the graph.
+             Two interchangeable readers over the one document (/openapi/v1.json): the standalone
+             Swagger UI and Scalar. -->
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+        <PackageReference Include="Scalar.AspNetCore" Version="2.16.16" />
     </ItemGroup>
 
 </Project>

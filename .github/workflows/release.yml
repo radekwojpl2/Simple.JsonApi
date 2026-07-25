@@ -85,13 +85,17 @@ jobs:
       - name: Build
         run: dotnet build JsonApiLite.sln --no-restore --configuration Release
 
-      - name: Pack JsonApiLite
+      # Both packages ship on the same version: JsonApiLite.OpenApi's dependency on JsonApiLite is
+      # a ProjectReference, so it resolves to whatever -p:Version is being packed here.
+      - name: Pack
         run: |
-          dotnet pack libs/JsonApiLite/JsonApiLite.csproj \
-            --no-build \
-            --configuration Release \
-            -p:Version=${{ needs.semantic-release.outputs.new_release_version }} \
-            --output ./artifacts
+          for project in libs/JsonApiLite/JsonApiLite.csproj libs/JsonApiLite.OpenApi/JsonApiLite.OpenApi.csproj; do
+            dotnet pack "$project" \
+              --no-build \
+              --configuration Release \
+              -p:Version=${{ needs.semantic-release.outputs.new_release_version }} \
+              --output ./artifacts
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

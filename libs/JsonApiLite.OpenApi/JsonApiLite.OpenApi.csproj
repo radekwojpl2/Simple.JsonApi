@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net10.0 only, unlike the core library. AddOpenApi and IOpenApiOperationTransformer
+         arrived in ASP.NET Core 9.0, and the schema model used here (JsonSchemaType,
+         IOpenApiSchema, Const) is Microsoft.OpenApi 2.x, which ASP.NET Core only takes a
+         dependency on from 10.0. There is nothing to multi-target back to net8.0. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Simple.JsonApi.OpenApi</PackageId>
+    <Authors>Radosław Bajor</Authors>
+    <Description>OpenAPI schema generation for Simple.JsonApi documents. The JSON:API document types carry custom converters that ASP.NET Core's schema generator reads as opaque, so bound bodies render as an empty {}; this package describes them from the attribute and relationship types instead.</Description>
+    <PackageTags>json-api;jsonapi;json:api;openapi;swagger;aspnetcore;rest;api</PackageTags>
+    <Copyright>Copyright (c) 2026 Radosław Bajor</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/radekwojpl2/Simple.JsonApi</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/radekwojpl2/Simple.JsonApi</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <!-- Microsoft.OpenApi is pinned above the version Microsoft.AspNetCore.OpenApi drags in
+         transitively (2.0.0), which carries NU1903 (high severity); 2.8.0 is the first patched
+         release. The pin lives here rather than in consuming apps because this is the package
+         that puts Microsoft.OpenApi on their graph. -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../JsonApiLite/JsonApiLite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The repository readme and license travel with the package. -->
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

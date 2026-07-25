@@ -2,6 +2,7 @@ using System.Text.Json;
 using JsonApiLite;
 using JsonApiPoc.Api;
 using Microsoft.AspNetCore.Diagnostics;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +24,24 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     }
 });
 
+// Generate an OpenAPI document for the routes. The framework describes the HTTP surface — methods,
+// paths, query and route parameters — but the JSON:API bodies carry custom converters it reads as
+// opaque, so it leaves them blank. UseJsonApiBodies() (from JsonApiLite.OpenApi) fills them from the
+// .AcceptsJsonApi/.ProducesJsonApi annotations on each endpoint.
+builder.Services.AddOpenApi(options => options.UseJsonApiBodies());
+
 var app = builder.Build();
+
+// Serve the generated document at /openapi/v1.json and two readers over it — the Swagger UI at
+// /swagger and Scalar at /scalar — but only in Development: this is a sample app, and none of it
+// belongs on a deployed surface by default. Both point at the same document, which is the test:
+// if the JSON:API bodies render in both, the document is portable.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "JsonApiPoc.Api"));
+    app.MapScalarApiReference(options => options.WithOpenApiRoutePattern("/openapi/v1.json"));
+}
 
 // A body the framework cannot bind throws during binding, before any handler runs. Without this
 // the client would get a plain 400; JSON:API callers expect an errors document.
@@ -66,7 +84,8 @@ app.MapGet("/contacts", (int? pageNumber, int? pageSize) =>
     };
 
     return JsonApi.Ok(document);
-});
+})
+.ProducesJsonApi<ResourceCollectionDocument<ContactAttributes, ContactRelationships, PageMeta>>();
 
 // ---------------------------------------------------------------------------------------------
 // GET one resource, optionally with its company sideloaded into 'included'.
@@ -97,7 +116,10 @@ app.MapGet("/contacts/{id}", (string id, string? include) =>
     };
 
     return JsonApi.Ok(document);
-});
+})
+.ProducesJsonApi<ResourceDocument<ContactAttributes, ContactRelationships>>()
+// The failure path is a JSON:API document too, so it is declared the same way.
+.ProducesJsonApiError(StatusCodes.Status404NotFound);
 
 // ---------------------------------------------------------------------------------------------
 // POST a create. The client sends no id; the server assigns one and answers 201 with a Location.
@@ -133,7 +155,10 @@ app.MapPost("/contacts", (
 
     http.Response.Headers.Location = $"/contacts/{contact.Id}";
     return JsonApi.Created(document);
-});
+})
+.AcceptsJsonApi<ResourceDocument<ContactAttributes, ContactRelationships>>()
+.ProducesJsonApi<ResourceDocument<ContactAttributes, ContactRelationships>>(StatusCodes.Status201Created)
+.ProducesJsonApiError(StatusCodes.Status422UnprocessableEntity);
 
 // ---------------------------------------------------------------------------------------------
 // PATCH an update, where the tri-state earns its keep: an attribute the body omits keeps its
@@ -184,7 +209,11 @@ app.MapPatch("/contacts/{id}", (
     };
 
     return JsonApi.Ok(document);
-});
+})
+.AcceptsJsonApi<ResourceDocument<ContactPatchAttributes, ContactRelationships>>(includeId: true)
+.ProducesJsonApi<ResourceDocument<ContactAttributes, ContactRelationships>>()
+.ProducesJsonApiError(StatusCodes.Status404NotFound)
+.ProducesJsonApiError(StatusCodes.Status422UnprocessableEntity);
 
 // ---------------------------------------------------------------------------------------------
 // DELETE. No body either way, so nothing here is JSON:API except the 404.
@@ -199,7 +228,11 @@ app.MapDelete("/contacts/{id}", (string id) =>
 
     Store.Contacts.Remove(contact);
     return Results.NoContent();
-});
+})
+// Success carries no body, so the built-in extension describes it; the 404 still answers with an
+// error document.
+.Produces(StatusCodes.Status204NoContent)
+.ProducesJsonApiError(StatusCodes.Status404NotFound);
 
 // ---------------------------------------------------------------------------------------------
 // Relationship endpoints: linkage only, as ToOneLinkageDocument / ToManyLinkageDocument.
@@ -227,7 +260,9 @@ app.MapGet("/contacts/{id}/relationships/company", (string id) =>
             Related = $"/contacts/{id}/company",
         },
     });
-});
+})
+.ProducesJsonApi<ToOneLinkageDocument>()
+.ProducesJsonApiError(StatusCodes.Status404NotFound);
 
 app.MapPatch("/contacts/{id}/relationships/company", (string id, ToOneLinkageDocument? request) =>
 {
@@ -245,7 +280,11 @@ app.MapPatch("/contacts/{id}/relationships/company", (string id, ToOneLinkageDoc
     // data: null clears the relationship, an identifier repoints it.
     contact.CompanyId = request.Data?.Id;
     return Results.NoContent();
-});
+})
+.AcceptsJsonApi<ToOneLinkageDocument>()
+.Produces(StatusCodes.Status204NoContent)
+.ProducesJsonApiError(StatusCodes.Status404NotFound)
+.ProducesJsonApiError(StatusCodes.Status422UnprocessableEntity);
 
 app.MapGet("/contacts/{id}/company", (string id) =>
 {
@@ -275,7 +314,9 @@ app.MapGet("/contacts/{id}/company", (string id) =>
         Data = Mapping.ToResource(company),
         Links = new Links { Self = $"/contacts/{id}/company" },
     });
-});
+})
+.ProducesJsonApi<ResourceDocument<CompanyAttributes, CompanyRelationships>>()
+.ProducesJsonApiError(StatusCodes.Status404NotFound);
 
 app.MapGet("/companies/{id}", (string id) =>
 {
@@ -290,6 +331,8 @@ app.MapGet("/companies/{id}", (string id) =>
         Data = Mapping.ToResource(company),
         Links = new Links { Self = $"/companies/{id}" },
     });
-});
+})
+.ProducesJsonApi<ResourceDocument<CompanyAttributes, CompanyRelationships>>()
+.ProducesJsonApiError(StatusCodes.Status404NotFound);
 
 app.Run();
