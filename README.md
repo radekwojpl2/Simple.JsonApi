@@ -257,9 +257,8 @@ and a `Location`, a PATCH demonstrating the tri-state, delete, the relationship 
 endpoints, 404/422 as error documents, and an OpenAPI document served to both Swagger UI and
 Scalar. `JsonApi.cs` is the entire ASP.NET seam, since the library models documents and not HTTP.
 
-It references `Simple.JsonApi.OpenApi` from the repository rather than nuget.org, because that
-package has not shipped yet; once it has, both go back to a `PackageReference` so the libraries are
-exercised the way an outside caller would.
+It references `Simple.JsonApi` and `Simple.JsonApi.OpenApi` from nuget.org rather than the source
+next to it — the libraries are exercised the way an outside caller would.
 
 It is a demonstration, not a reference implementation: storage is a static list, `include` accepts
 one value, query parameters are hand-parsed, there is no content negotiation and no auth, and

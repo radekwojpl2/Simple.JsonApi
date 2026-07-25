@@ -7,10 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Simple.JsonApi.OpenApi is not published yet, so it comes from the repository and pulls
-             JsonApiLite in with it. Once it ships, both go back to a PackageReference — the sample
-             is meant to consume the libraries the way an outside caller would. -->
-        <ProjectReference Include="../libs/JsonApiLite.OpenApi/JsonApiLite.OpenApi.csproj" />
+        <!-- The published packages, not project references: this sample consumes the libraries the
+             way an outside caller would. The preview version is what the pull request publishes;
+             it becomes a release version once the branch merges. -->
+        <PackageReference Include="Simple.JsonApi" Version="1.0.1-preview.6.34" />
+        <PackageReference Include="Simple.JsonApi.OpenApi" Version="1.0.1-preview.6.34" />
     </ItemGroup>
 
     <ItemGroup>
