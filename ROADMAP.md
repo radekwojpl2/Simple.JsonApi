@@ -46,9 +46,16 @@ blocked. Analysis and evidence in
 [#7](https://github.com/radekwojpl2/Simple.JsonApi/issues/7).
 
 **Query parameter helpers.** `include`, `fields`, `filter`, `sort` and `page` are spec-defined and
-entirely absent — no parsing, no building. Pagination surfaces only as `Links` the caller
-populates. Parsing these into typed values is in scope; *applying* them to a data source is not
-(see below).
+entirely absent — no parsing, no building. Pagination surfaces only as `Links` the caller populates.
+
+Parsing them into typed values belongs in the core package: it is string handling, with no HTTP in
+it. Binding those values as a handler parameter does not, because it needs ASP.NET Core — so it
+follows the same split as the OpenAPI package, and it has to cover **minimal APIs and
+FastEndpoints** equally, as the annotations already do. Neither should be the one that gets the
+worked example while the other gets a paragraph. The OpenAPI package would then describe the
+parameters an endpoint binds, so they appear in the document instead of being undocumented strings.
+
+*Applying* the parsed values to a data source stays out of scope (see below).
 
 ## Later
 
