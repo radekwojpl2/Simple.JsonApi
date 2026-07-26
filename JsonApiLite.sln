@@ -10,6 +10,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonApiLite.Tests", "libs\t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonApiLite.OpenApi", "libs\JsonApiLite.OpenApi\JsonApiLite.OpenApi.csproj", "{46083E46-F07D-4DA1-98BB-FB101DB1996C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "files", "files", "{4164C80D-C7AB-45DD-9F60-763534A29522}"
+	ProjectSection(SolutionItems) = preProject
+		ROADMAP.md = ROADMAP.md
+		CLAUDE.md = CLAUDE.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
