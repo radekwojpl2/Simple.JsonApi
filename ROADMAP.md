@@ -2,10 +2,15 @@
 
 What is planned, what is not, and why.
 
+_Last reviewed: 2026-07-27._
+
 Ordering rather than dates, and no version numbers: releases are cut by semantic-release from
 Conventional Commits when a branch merges, so the next number is not something this file can
 promise. [CHANGELOG.md](CHANGELOG.md) records what shipped; this is the only forward-looking
 document.
+
+The ordering is the maintainer's current read, not a commitment. A reported use case moves an item
+faster than anything else here — see [Requests](#requests).
 
 ## Works today
 
@@ -32,23 +37,13 @@ and `errors` and stops there. A collection endpoint that declares a `TMeta` gets
 and pagination links are undocumented — the two things a list endpoint most needs to communicate.
 The document envelope is the missing piece, not the resource inside it.
 
-**Schemas under Swashbuckle and NSwag.** Today an app whose document comes from Swashbuckle's
+**Schemas under Swashbuckle and NSwag.** An app whose document comes from Swashbuckle's
 `SwaggerGen` or from NSwag gets the operations but not the bodies, because neither runs the
-transformer. This is also what stands between the library and `FastEndpoints.Swagger`, which is
-NSwag-based and is the integration the FastEndpoints documentation steers people toward.
-
-The likely shape is a small package per generator — an `IOperationFilter` for Swashbuckle, an
-`IOperationProcessor` for NSwag — rather than more surface on the existing one. Both hooks run
-*after* the generator has produced its own schema, which is the property that matters:
-`WithOpenApi` metadata gets overwritten by Swashbuckle whenever an endpoint also calls
-`Produces()`, while a filter has the last word.
-
-That work would also settle **net8.0 support** for the OpenAPI package, which is otherwise blocked.
-net8 resolves `Microsoft.AspNetCore.OpenApi` 8.0.29 against `Microsoft.OpenApi` 1.4.3: no
-`AddOpenApi`, no transformers, and an incompatible schema model (`Type` as a string, `Nullable` as
-a flag, no `Const`). There is nothing to multi-target back to. A Swashbuckle filter package, by
-contrast, has no such floor and can target net8.0 directly. The core `Simple.JsonApi` package
-already supports net8.0 and always will.
+transformer — which is also what stands between the library and `FastEndpoints.Swagger`. The likely
+shape is a small package per generator, hooking in after the generator has built its own schema.
+Doing it would additionally bring net8.0 support to the OpenAPI package, which is otherwise
+blocked. Analysis and evidence in
+[#7](https://github.com/radekwojpl2/Simple.JsonApi/issues/7).
 
 **Query parameter helpers.** `include`, `fields`, `filter`, `sort` and `page` are spec-defined and
 entirely absent — no parsing, no building. Pagination surfaces only as `Links` the caller
@@ -116,14 +111,6 @@ additions, and a request to cross one is likely to be declined.
   product; this one models the wire and hands you the objects.
 - **A server framework.** No controllers, no conventions, no routing. The annotations describe
   endpoints you wrote; they do not generate them.
-
-## Known limitations
-
-- **Typed meta requires the typed-relationships document.** `ResourceDocument<TAttributes, TMeta>`
-  cannot coexist with `ResourceDocument<TAttributes, TRelationships>`, because C# identifies a
-  generic type by name and arity alone — constraints are not part of that identity. Use
-  `ResourceDocument<TAttributes, TRelationships, TMeta>`. Unlikely to change; the workaround is
-  exact and the alternative is renaming a type.
 
 ## Requests
 

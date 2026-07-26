@@ -297,7 +297,8 @@ design, and a few document-level features are genuinely missing.
 - Typing meta requires the typed-relationships document. `ResourceDocument<TAttributes, TMeta>`
   cannot exist alongside `ResourceDocument<TAttributes, TRelationships>`, because C# identifies a
   generic type by name and arity alone — constraints are not part of that identity. Use
-  `ResourceDocument<TAttributes, TRelationships, TMeta>`.
+  `ResourceDocument<TAttributes, TRelationships, TMeta>`. Unlikely to change: the workaround is
+  exact, and the alternative is renaming a type.
 
 Which of these are expected to change, and which are boundaries rather than gaps, is in the
 [roadmap](https://github.com/radekwojpl2/Simple.JsonApi/blob/main/ROADMAP.md).
