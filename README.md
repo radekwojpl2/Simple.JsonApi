@@ -202,6 +202,32 @@ var problem = new ErrorDocument
 JsonApiMediaType.Value   // "application/vnd.api+json"
 ```
 
+## OpenAPI
+
+The document types carry custom converters, and ASP.NET Core's schema generator treats a converter
+as opaque — so a bound body renders as an empty `{}`. `Simple.JsonApi.OpenApi` describes it from
+the attribute and relationship types instead. It is a separate package because it needs ASP.NET
+Core 10 and Microsoft.OpenApi 2.x, which the wire model deliberately does not.
+
+```
+dotnet add package Simple.JsonApi.OpenApi
+```
+
+```csharp
+builder.Services.AddOpenApi(options => options.UseJsonApiBodies());
+
+app.MapPatch("/contacts/{id}", Handler)
+    .AcceptsJsonApi<ResourceDocument<ContactPatchAttributes, ContactRelationships>>(includeId: true)
+    .ProducesJsonApi<ResourceDocument<ContactAttributes, ContactRelationships>>()
+    .ProducesJsonApiError(StatusCodes.Status404NotFound);
+```
+
+Each annotation names the document the same way the handler binds or builds it, and the generated
+schema follows: the resource `type` is pinned to a constant, a collection document becomes an
+array, linkage endpoints get identifiers, and `Optional<T>` attributes are documented as nullable —
+the explicit null a PATCH uses to clear a member. Member names and enum representation are read
+from the serializer options, so pass yours to `UseJsonApiBodies` if the app configured its own.
+
 ## Also in the box
 
 - `Resource<TAttributes>` — relationships keyed by name, the escape hatch when they are not known
@@ -225,12 +251,14 @@ built as objects and round-tripped; raw JSON appears only as expected output or 
 
 ## A sample that consumes the package
 
-[`JsonApiPoc.Api`](JsonApiPoc.Api) is a minimal API over in-memory mock data, referencing
-`Simple.JsonApi` from nuget.org rather than the source next to it — the library is exercised the
-way an outside caller would. It covers a collection with pagination links and meta, a single
-resource with `include`, create returning 201 and a `Location`, a PATCH demonstrating the
-tri-state, delete, the relationship and related endpoints, and 404/422 as error documents.
-`JsonApi.cs` is the entire ASP.NET seam, since the library models documents and not HTTP.
+[`JsonApiPoc.Api`](JsonApiPoc.Api) is a minimal API over in-memory mock data. It covers a
+collection with pagination links and meta, a single resource with `include`, create returning 201
+and a `Location`, a PATCH demonstrating the tri-state, delete, the relationship and related
+endpoints, 404/422 as error documents, and an OpenAPI document served to both Swagger UI and
+Scalar. `JsonApi.cs` is the entire ASP.NET seam, since the library models documents and not HTTP.
+
+It references `Simple.JsonApi` and `Simple.JsonApi.OpenApi` from nuget.org rather than the source
+next to it — the libraries are exercised the way an outside caller would.
 
 It is a demonstration, not a reference implementation: storage is a static list, `include` accepts
 one value, query parameters are hand-parsed, there is no content negotiation and no auth, and
@@ -257,7 +285,8 @@ design, and a few document-level features are genuinely missing.
 **Deliberately absent**
 
 - **HTTP.** Content negotiation, status codes, the `Location` header on 201, and the `406`/`415`
-  responses are the caller's. `JsonApiMediaType.Value` is the only concession.
+  responses are the caller's. `JsonApiMediaType.Value` is the only concession, and the one thing
+  that does touch ASP.NET Core — OpenAPI schema generation — is a separate package.
 - **Validation.** Documents are not checked against the spec beyond what parsing requires. A
   relationship with none of `data`/`links`/`meta` is rejected and a declared arity mismatch is
   rejected, but member requirements are otherwise not enforced — a resource identifier arriving
@@ -268,7 +297,11 @@ design, and a few document-level features are genuinely missing.
 - Typing meta requires the typed-relationships document. `ResourceDocument<TAttributes, TMeta>`
   cannot exist alongside `ResourceDocument<TAttributes, TRelationships>`, because C# identifies a
   generic type by name and arity alone — constraints are not part of that identity. Use
-  `ResourceDocument<TAttributes, TRelationships, TMeta>`.
+  `ResourceDocument<TAttributes, TRelationships, TMeta>`. Unlikely to change: the workaround is
+  exact, and the alternative is renaming a type.
+
+Which of these are expected to change, and which are boundaries rather than gaps, is in the
+[roadmap](https://github.com/radekwojpl2/Simple.JsonApi/blob/main/ROADMAP.md).
 
 ## License
 

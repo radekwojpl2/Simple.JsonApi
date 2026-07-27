@@ -54,11 +54,13 @@ jobs:
       - name: Pack
         if: github.event_name == 'pull_request'
         run: |
-          dotnet pack libs/JsonApiLite/JsonApiLite.csproj \
-            --no-build \
-            --configuration Release \
-            -p:Version=${{ steps.version.outputs.version }} \
-            --output ./artifacts
+          for project in libs/JsonApiLite/JsonApiLite.csproj libs/JsonApiLite.OpenApi/JsonApiLite.OpenApi.csproj; do
+            dotnet pack "$project" \
+              --no-build \
+              --configuration Release \
+              -p:Version=${{ steps.version.outputs.version }} \
+              --output ./artifacts
+          done
 
       - name: Upload preview package
         if: github.event_name == 'pull_request'
@@ -120,10 +122,11 @@ jobs:
           MARKER="<!-- preview-packages -->"
           BODY=$(printf '%s\n' \
             "$MARKER" \
-            "📦 Preview package published to nuget.org as **$VERSION**:" \
+            "📦 Preview packages published to nuget.org as **$VERSION**:" \
             "" \
             '```' \
             "dotnet add package Simple.JsonApi --version $VERSION" \
+            "dotnet add package Simple.JsonApi.OpenApi --version $VERSION" \
             '```' \
             "" \
             "_The package can take a few minutes to appear while nuget.org validates and indexes it._")
