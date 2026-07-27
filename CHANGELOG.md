@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/radekwojpl2/Simple.JsonApi/compare/v1.0.0...v1.1.0) (2026-07-27)
+
+
+### Features
+
+* add Simple.JsonApi.OpenApi ([8428c17](https://github.com/radekwojpl2/Simple.JsonApi/commit/8428c173451a9c7cefe5794528bbf011a3b2e3d8))
+* add Simple.JsonApi.OpenApi ([ca6baeb](https://github.com/radekwojpl2/Simple.JsonApi/commit/ca6baeb414e80cb95714d94606426efd297133bb))
+
 # [1.0.0](https://github.com/radekwojpl2/json-api-format-poc/compare/v0.1.1...v1.0.0) (2026-07-23)
 
 
