@@ -111,7 +111,7 @@ app.MapGet("/contacts/{id}", (string id, string? include) =>
     var document = new ResourceDocument<ContactAttributes, ContactRelationships>
     {
         Data = Mapping.ToResource(contact),
-        Included = included.Count > 0 ? included : null,
+        Included = included.Count > 0 ? [.. included] : null,
         Links = new Links { Self = $"/contacts/{id}" },
     };
 

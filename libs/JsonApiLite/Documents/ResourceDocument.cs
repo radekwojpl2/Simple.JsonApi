@@ -31,15 +31,23 @@ public sealed record ResourceDocument<TAttributes> where TAttributes : class
 /// the resource's relationship names are known at compile time.</summary>
 /// <typeparam name="TMeta">The document's meta shape. The spec reserves no meta member names, so
 /// this is entirely the endpoint's own: declare a record for what it actually sends.</typeparam>
-public record ResourceDocument<TAttributes, TRelationships, TMeta>
+/// <typeparam name="TIncluded">The document's sideload shape — one member per resource type the
+/// document may sideload, so a sideloaded resource is reached by member rather than by cast.
+/// Defaults to <see cref="AnyIncluded"/>, which leaves the member untyped.</typeparam>
+public record ResourceDocument<TAttributes, TRelationships, TMeta, TIncluded>
     where TAttributes : class, IAttributes
     where TRelationships : class, IRelationships
     where TMeta : class, IMeta
+    where TIncluded : class, IIncluded
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public required Resource<TAttributes, TRelationships>? Data { get; init; }
 
-    public IReadOnlyList<Resource>? Included { get; init; }
+    /// <summary>Compound-document resources (https://jsonapi.org/format/#document-compound-documents),
+    /// bucketed into <typeparamref name="TIncluded"/>'s members by resource type. One flat array on
+    /// the wire whatever the declaration — the shape is a reading convenience, not a wire
+    /// change.</summary>
+    public TIncluded? Included { get; init; }
 
     public Links? Links { get; init; }
 
@@ -47,6 +55,16 @@ public record ResourceDocument<TAttributes, TRelationships, TMeta>
 
     public JsonApiObject? JsonApi { get; init; }
 }
+
+/// <summary>The same document with the sideload member left untyped. C# has no default type
+/// arguments, so the default is spelled as a subtype; name TIncluded explicitly — which means
+/// naming TMeta too, even if only to leave it as <see cref="JsonApiLite.Meta"/> — to declare the
+/// resource types the document may sideload.</summary>
+public record ResourceDocument<TAttributes, TRelationships, TMeta>
+    : ResourceDocument<TAttributes, TRelationships, TMeta, AnyIncluded>
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships
+    where TMeta : class, IMeta;
 
 /// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>.
 /// C# has no default type arguments, so the default is spelled as a subtype; name TMeta

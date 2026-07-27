@@ -22,9 +22,15 @@ public static class JsonApiSerializer
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             TypeInfoResolver = new DefaultJsonTypeInfoResolver
             {
-                Modifiers = { OmitUnsetOptionalMembers },
+                Modifiers = { OmitUnsetOptionalMembers, OmitEmptySideloads },
             },
         };
+
+        // Unconditional, and not an attribute on IIncluded: a converter attribute on an interface
+        // does not reach implementing types, and the declared shapes are the caller's own types
+        // anyway. Registering it here is also what stops AnyIncluded being claimed by the built-in
+        // collection converter, which cannot populate a read-only collection.
+        options.Converters.Add(new IncludedConverterFactory());
         if (resourceTypes is not null)
         {
             options.Converters.Add(new ResourceConverter(resourceTypes));
@@ -43,6 +49,21 @@ public static class JsonApiSerializer
 
     public static TDocument? Deserialize<TDocument>(string json, JsonSerializerOptions options) =>
         JsonSerializer.Deserialize<TDocument>(json, options);
+
+    /// <summary>A document that sideloads nothing omits 'included' rather than writing it empty.
+    /// The null check the other members rely on is not enough here: a declared shape with every
+    /// member unset is an object, not a null, and would otherwise write an empty array.</summary>
+    private static void OmitEmptySideloads(JsonTypeInfo typeInfo)
+    {
+        foreach (var property in typeInfo.Properties)
+        {
+            if (typeof(IIncluded).IsAssignableFrom(property.PropertyType))
+            {
+                property.ShouldSerialize = (_, value) =>
+                    value is IIncluded included && !IncludedShape.For(included.GetType()).IsEmpty(included);
+            }
+        }
+    }
 
     /// <summary>An unset <see cref="Optional{T}"/> member is "not in the document" — never write it.</summary>
     private static void OmitUnsetOptionalMembers(JsonTypeInfo typeInfo)

@@ -18,17 +18,23 @@ public sealed record ResourceCollectionDocument<TAttributes> where TAttributes :
 }
 
 /// <summary>Collection document with the relationships typed as well; see
-/// <see cref="ResourceDocument{TAttributes, TRelationships, TMeta}"/>.</summary>
+/// <see cref="ResourceDocument{TAttributes, TRelationships, TMeta, TIncluded}"/>.</summary>
 /// <typeparam name="TMeta">The document's meta shape — on a list endpoint, usually where the
 /// page counts live. The spec names no meta members, so the shape is the endpoint's own.</typeparam>
-public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
+/// <typeparam name="TIncluded">The document's sideload shape — one member per resource type the
+/// document may sideload. Defaults to <see cref="AnyIncluded"/>, which leaves the member
+/// untyped.</typeparam>
+public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta, TIncluded>
     where TAttributes : class, IAttributes
     where TRelationships : class, IRelationships
     where TMeta : class, IMeta
+    where TIncluded : class, IIncluded
 {
     public required IReadOnlyList<Resource<TAttributes, TRelationships>> Data { get; init; }
 
-    public IReadOnlyList<Resource>? Included { get; init; }
+    /// <summary>Compound-document resources, bucketed into <typeparamref name="TIncluded"/>'s
+    /// members by resource type. One flat array on the wire whatever the declaration.</summary>
+    public TIncluded? Included { get; init; }
 
     public Links? Links { get; init; }
 
@@ -36,6 +42,14 @@ public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
 
     public JsonApiObject? JsonApi { get; init; }
 }
+
+/// <summary>The same document with the sideload member left untyped; see
+/// <see cref="ResourceDocument{TAttributes, TRelationships, TMeta}"/>.</summary>
+public record ResourceCollectionDocument<TAttributes, TRelationships, TMeta>
+    : ResourceCollectionDocument<TAttributes, TRelationships, TMeta, AnyIncluded>
+    where TAttributes : class, IAttributes
+    where TRelationships : class, IRelationships
+    where TMeta : class, IMeta;
 
 /// <summary>The same document with meta left as the built-in <see cref="JsonApiLite.Meta"/>;
 /// see <see cref="ResourceDocument{TAttributes, TRelationships}"/>.</summary>

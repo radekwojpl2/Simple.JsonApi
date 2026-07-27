@@ -137,3 +137,20 @@ set by hand and `CHANGELOG.md` is never edited (Constitution, *Development Workf
 | **A breaking public API change.** `Included`'s type changes on all four document forms. | Chosen deliberately in the spec's clarification session: one way to express a document, rather than an old family and a new one (FR-021). | The additive alternative was rejected by the spec author with the trade-off stated. Precedent exists — ROADMAP.md already accepts a breaking change for `lid`: "The cost is a breaking change: `ResourceIdentifier` is a positional record over `Type` and `Id`". Mitigated by D4/D5: every break is a compile error with a one-token fix. |
 | **The dictionary-relationships flavour cannot declare sideloadable types.** `ResourceDocument<TAttributes>` keeps the untyped form, because the arity slot it needs is taken. | C# has no default type arguments, and an arity-2 overload would collide with `ResourceDocument<TAttributes, TRelationships>`. | Reordering the type parameters would let it work but would silently reinterpret every existing arity-3 usage (research D3). Accepting a gap on the escape-hatch flavour is cheaper than a silent reinterpretation of correct code. Read strictly this is a partial gap against FR-001 and should be confirmed as acceptable. |
 | **Reflection in the core library.** `IncludedShape` reflects over `TIncluded`'s members. | Needed to map a wire type name to a declared member without asking the author to write the dispatch by hand (FR-002). | A source generator was rejected as disproportionate and would be the repository's first. Reflection is cached per closed generic type, so it runs once, not per document; if it ever appears in a profile a generator can replace it behind the same public surface. |
+
+### T035 — the dictionary-relationships gap, decided
+
+**Accepted as a permanent gap, not a follow-up.** `ResourceDocument<TAttributes>` and
+`ResourceCollectionDocument<TAttributes>` keep `IReadOnlyList<Resource>? Included` and cannot declare
+sideloadable types. Read strictly this is a partial gap against FR-001.
+
+Two things make it the right call rather than an omission. The arity slot a typed version needs is
+already `ResourceDocument<TAttributes, TRelationships>`, and reordering the type parameters to free
+one would silently reinterpret every existing arity-3 usage — the one failure mode this design
+exists to avoid (research D3). And the flavour is explicitly the escape hatch for an author who does
+not know their relationship names at compile time; such an author is not in a position to enumerate
+their sideloadable types either.
+
+The consequence is that these two forms are also the only ones whose `Included` member is unchanged
+by this feature, so nothing assigning to them breaks. Reopening it would need a different arity
+scheme, not an addition to this one.

@@ -225,11 +225,32 @@ And (*Document Structure*):
 So heterogeneity is required, not incidental, and FR-010's "serialize identically" is the constraint
 that keeps this a compile-time change only.
 
-**Open implementation question, not a blocker**: member ordering on write. The specification does not
-require any order within `included`, so declaration order is a free choice — but the existing tests
-compare serialized output, so whichever order is chosen must be deterministic. `notSure` — whether
-any existing test asserts a specific ordering of `included` elements; `dotnet test` after the change
-will settle it, and `CompoundDocumentTests.cs:138` is the first place to look.
+**Member ordering on write — settled during implementation (T022).** The specification does not
+require any order within `included`, so declaration order is a free choice, but the order must be
+deterministic. The earlier `notSure` asked whether any existing test pins one. **It does — three
+do**, each by comparing serialized output byte for byte:
+
+| Test | What it pins |
+| --- | --- |
+| `SerializationTests.cs:108` `Writes_included_resources_with_their_concrete_attribute_types` | `companies` then `tags` |
+| `CompoundDocumentTests.cs:11` `Writes_a_paged_collection_…` | company `7` then company `8` |
+| `CompoundDocumentTests.cs:68` `Included_resources_carry_their_own_relationships` | a single element |
+
+Found by `grep -rn '"included":\[' libs/tests`. So ordering is load-bearing and cannot be left to
+chance.
+
+**A second finding that came out of settling it.** Taking `Type.GetProperties()` in the order it
+returns is not sufficient, because that order is not specified. Checked
+https://learn.microsoft.com/dotnet/api/system.reflection.type.getproperties (*Remarks*):
+
+> "The GetProperties method does not return properties in a particular order, such as alphabetical
+> or declaration order."
+
+Members are therefore sorted by `MetadataToken`, which follows declaration order in the emitted
+metadata. `notSure` — whether `MetadataToken` ordering is *guaranteed* to equal declaration order by
+any specification, as against being reliable in practice on the runtimes tested here; ECMA-335 §II.22
+would settle it. The tests pass on both net8.0 and net10.0 either way, and nothing outside this
+library depends on the order.
 
 ---
 
