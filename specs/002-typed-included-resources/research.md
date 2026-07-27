@@ -177,20 +177,33 @@ evidence behind SC-004.
 
 ---
 
-## D6: Where undeclared sideloaded resources live
+## D6: What happens to undeclared sideloaded resources
 
-**Decision**: `IIncluded` carries an `Undeclared` member — `IReadOnlyList<Resource>` — which every
-implementation must expose, including declared ones.
+**Decision (revised 2026-07-28)**: They are **dropped**. `IIncluded` is an empty marker, like
+`IAttributes` and `IRelationships`.
 
-**Rationale**: This is forced by the two clarification answers taken together. Because a declared
-document exposes no untyped view (FR-017), a sideloaded resource whose type no member names would
-otherwise be unreachable, and Story 3 exists precisely to stop it being silently dropped. Verified
-by probes 3b and 4a:
+**Rationale**: A declaration is exhaustive — an author who has stated which resource types their
+document may carry has, by that act, said they want nothing else. Carrying a bucket for types the
+author explicitly did not declare is ceremony on every declaration, and the concept earns nothing an
+author asked for.
+
+**Superseded decision**: this section previously specified an `Undeclared` member on `IIncluded`,
+required on every implementation, on the grounds that the two clarification answers taken together
+left such a resource unreachable. That reasoning was sound but the premise was not challenged: the
+right response to "the combination leaves nowhere to put it" turned out to be "then do not keep it",
+not "add a place". The probe evidence below still holds and is why the reasoning was worth recording.
 
 ```
-PASS  3b Undeclared present on declared doc
 PASS  4a declared Included is NOT IReadOnlyList<Resource> (see CS8121 note)
 ```
+
+**Accepted cost**: a parse-then-write round trip loses resources the declaration did not name, and
+nothing signals it. Pinned by `A_dropped_resource_is_not_written_back`, named for the cost so it
+cannot be mistaken for an incidental assertion.
+
+**Alternative rejected**: moving `Undeclared` onto an inherited abstract base record, which would
+have kept the data and removed the per-declaration boilerplate. Rejected deliberately: it keeps a
+concept the author has no use for. The simpler model was preferred over the safer one.
 
 Probe 4a is worth reading carefully. The first attempt wrote the check as a runtime pattern test and
 the compiler rejected it outright:
@@ -208,8 +221,8 @@ member the untyped way, because the code will not compile.
 
 ## D7: Round-tripping and wire fidelity
 
-**Decision**: The converter flattens every declared member plus `Undeclared` into one array on write,
-and buckets on read by peeking each element's `type`.
+**Decision**: The converter flattens the declared members into one array on write, and buckets on
+read by peeking each element's `type`.
 
 **Rationale**: The wire shape is fixed by the specification. Checked https://jsonapi.org/format/
 (*Compound Documents*):
@@ -263,7 +276,7 @@ library depends on the order.
 | D3 | Append `TIncluded` as arity 4; arities 1–3 keep current meanings | probe 2a |
 | D4 | `AnyIncluded` implements `IReadOnlyList<Resource>` + `[CollectionBuilder]` | probe 1a–1e |
 | D5 | Break is 3 assignment forms, all compile errors, fix is `[.. x]` | Break.cs / Remedy.cs |
-| D6 | `Undeclared` on `IIncluded`; FR-017 enforced by the compiler | probe 3b, 4a, CS8121 |
+| D6 | Undeclared types are dropped; `IIncluded` is an empty marker (revised 2026-07-28) | probe 4a, CS8121 |
 | D7 | Converter flattens on write, buckets on read | jsonapi.org/format |
 
 No `NEEDS CLARIFICATION` items remain from the Technical Context.

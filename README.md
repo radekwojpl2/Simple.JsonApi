@@ -163,9 +163,6 @@ public sealed record ContactIncluded : IIncluded
 {
     public IReadOnlyList<Resource<CompanyAttributes, CompanyRelationships>>? Companies { get; init; }
     public IReadOnlyList<Resource<TagAttributes, TagRelationships>>? Tags { get; init; }
-
-    // Resources whose type no member above names. Never dropped.
-    public IReadOnlyList<Resource> Undeclared { get; init; } = [];
 }
 
 var document = JsonApiSerializer
@@ -178,6 +175,10 @@ The type name is never written as a string — it comes from `CompanyAttributes.
 typo is a compile error. A declared document needs no `ResourceTypeRegistry`: its members already
 say which types to expect. `included` stays one flat array on the wire, as the specification
 requires.
+
+A declaration is exhaustive: a sideloaded resource whose type no member names is **dropped** when
+the document is read, and is not written back. Declare every type you care about, or leave the
+document undeclared and keep them all.
 
 Declaring is optional. Without it, `Included` is an `AnyIncluded` — still an
 `IReadOnlyList<Resource>`, reading back as `Resource<JsonObject>` unless you register the types:

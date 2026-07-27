@@ -39,13 +39,7 @@ A declared document and an undeclared one produce identical bytes for identical 
 /// <summary>Marks a record as a document's sideload shape — one member per resource type the
 /// document may sideload, each an IReadOnlyList of that resource. Sits over the single flat array
 /// the specification requires, as IRelationships sits over a name-keyed object.</summary>
-public interface IIncluded
-{
-    /// <summary>Sideloaded resources whose type no declared member names. The only route to a
-    /// resource the declaration did not anticipate, since a declared document exposes no untyped
-    /// view — never null.</summary>
-    IReadOnlyList<Resource> Undeclared { get; }
-}
+public interface IIncluded;   // empty marker, like IAttributes and IRelationships
 
 /// <summary>The sideload shape for a document that declares no sideloadable types: the resources
 /// as they arrived, untyped. Implements IReadOnlyList&lt;Resource&gt; so that reading a document
@@ -55,7 +49,6 @@ public sealed record AnyIncluded : IIncluded, IReadOnlyList<Resource>
 {
     public AnyIncluded(IReadOnlyList<Resource> resources);
 
-    public IReadOnlyList<Resource> Undeclared { get; }
     public Resource this[int index] { get; }
     public int Count { get; }
     public IEnumerator<Resource> GetEnumerator();
@@ -154,7 +147,6 @@ public sealed record ContactIncluded : IIncluded
 {
     public IReadOnlyList<Resource<CompanyAttributes, CompanyRelationships>>? Companies { get; init; }
     public IReadOnlyList<Resource<TagAttributes, TagRelationships>>? Tags { get; init; }
-    public IReadOnlyList<Resource> Undeclared { get; init; } = [];
 }
 
 // Read with no cast and no pattern match — this is the whole point (FR-004).

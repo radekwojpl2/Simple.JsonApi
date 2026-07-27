@@ -24,10 +24,6 @@ public sealed record AnyIncluded : IIncluded, IReadOnlyList<Resource>
         _resources = resources;
     }
 
-    /// <summary>Every resource in the document, since nothing here is declared: with no members to
-    /// resolve against, all of them are undeclared by definition.</summary>
-    public IReadOnlyList<Resource> Undeclared => _resources;
-
     /// <summary>The resource at <paramref name="index"/>, so an existing indexed read keeps
     /// working.</summary>
     public Resource this[int index] => _resources[index];

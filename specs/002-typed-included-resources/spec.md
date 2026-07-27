@@ -81,29 +81,31 @@ must be indistinguishable.
 
 ---
 
-### User Story 3 - A document carrying an undeclared resource type is not silently damaged (Priority: P3)
+### User Story 3 - A declaration is exhaustive (Priority: P3)
 
 A document arrives sideloading a resource type the reader's declaration does not name — a server
-that added a type, or a client written against an older view of the API. The reader must not lose
-that data, and must not fail merely because it was not expecting it.
+that added a type, or a client written against an older view of the API. A declaration states what
+the document may carry, so a type it does not name was not asked for: the resource is dropped, and
+parsing does not fail merely because it arrived.
 
-**Why this priority**: It is a robustness guarantee rather than new capability, and it only matters
-once the declaration exists, so it cannot be delivered before Stories 1 and 2. It is nonetheless a
-requirement and not an optional extra: silently discarding part of a document is the worst available
-outcome, because it is invisible at the point it happens.
+**Why this priority**: It defines what a declaration *means*, and only matters once the declaration
+exists, so it cannot be delivered before Stories 1 and 2.
 
 **Independent Test**: Declare one sideloadable type, parse a document sideloading that type plus a
-second undeclared one, and confirm the undeclared resource is still reachable and survives being
-written back out.
+second undeclared one, and confirm the declared resource arrives, the undeclared one does not, and
+no error is raised.
 
 **Acceptance Scenarios**:
 
 1. **Given** a declaration naming a subset of the types a document sideloads, **When** that document
-   is parsed, **Then** the undeclared resources remain reachable rather than being dropped.
-2. **Given** such a document, **When** it is parsed and written back out, **Then** the undeclared
-   resources appear in the output unchanged.
+   is parsed, **Then** the declared resources arrive in their members and the undeclared ones are
+   dropped.
+2. **Given** such a document, **When** it is parsed and written back out, **Then** the dropped
+   resources are absent from the output.
 3. **Given** such a document, **When** it is parsed, **Then** parsing succeeds — an undeclared
    sideloaded type is not an error.
+4. **Given** a document that declares no sideloadable types, **When** it is parsed, **Then** every
+   sideloaded resource is kept — dropping is a consequence of declaring, not of the member itself.
 
 ---
 
@@ -139,8 +141,24 @@ written back out.
   as a breaking change for consumers of the published preview packages.
 - Q: Once a document declares its sideloadable types, may its sideload member still be read the
   existing untyped way? → A: No — declaring commits the author to the typed view. A declared
-  document exposes one way to read its sideload member, and undeclared sideloaded resources are
-  given an explicit named home within it rather than falling back to an untyped view.
+  document exposes one way to read its sideload member.
+
+### Session 2026-07-28
+
+- Q: Should a declared document carry an `Undeclared` member holding sideloaded resources whose type
+  no member names? → A: No — drop them. The member was ceremony on every declaration: an author who
+  has stated which types their document may carry has, by that act, said they want nothing else.
+  Story 3 and FR-012/FR-013 were written the opposite way and are revised above.
+  - **Accepted cost**: a document that is read and written again loses the resources its declaration
+    did not name, with nothing signalling it. Pinned by a test named for the cost rather than left to
+    be discovered.
+  - **Why this is tolerable**: full linkage makes the sender responsible for what appears in
+    `included`, so a server assembling a document knows its own types, and a client parsing one
+    rarely re-emits what it did not ask for. An author who cannot enumerate their types keeps the
+    untyped form, which still holds everything (FR-014a).
+  - **Rejected alternative**: moving the member onto an inherited base record, which would have kept
+    the data and removed the boilerplate. Rejected because it keeps a concept the author has no use
+    for; the simpler model was preferred over the safer one deliberately.
 
 ## Requirements *(mandatory)*
 
@@ -183,13 +201,15 @@ written back out.
 
 **Undeclared types (Story 3)**
 
-- **FR-012**: A sideloaded resource whose type no declaration names MUST remain reachable after
-  parsing through an explicitly named place in the typed view, and MUST NOT be discarded. Because a
-  declared document offers no untyped view to fall back to (FR-017), this place is the only route to
-  such a resource and MUST therefore exist on every declared document, including one whose
-  declaration names every type the author expects.
-- **FR-013**: Such a resource MUST survive a parse-then-write round trip unchanged.
+- **FR-012**: A sideloaded resource whose type no declaration names MUST be dropped when the document
+  is read. A declaration is exhaustive: it states the resource types the document may carry, so one
+  it does not name was not asked for. [Revised 2026-07-28 — this requirement previously demanded the
+  opposite, that such a resource be preserved in a named member on every declared document. See
+  Clarifications.]
+- **FR-013**: A dropped resource MUST NOT appear when the document is written back out.
 - **FR-014**: Encountering an undeclared sideloaded type MUST NOT be treated as an error.
+- **FR-014a**: A document that declares no sideloadable types MUST keep every sideloaded resource it
+  receives. Dropping MUST be a consequence of declaring, never of the sideload member itself.
 
 **Applying to all three**
 
@@ -228,7 +248,7 @@ written back out.
 - **Sideloaded resource**: One entry in the sideload member — a full resource object, not merely an
   identifier, carrying everything a resource appearing as primary data carries.
 - **Undeclared sideloaded resource**: A sideloaded resource whose type the reader's declaration does
-  not name. Must survive reading and writing intact.
+  not name. Dropped on read, and absent when the document is written back.
 
 ## Success Criteria *(mandatory)*
 
@@ -243,8 +263,9 @@ written back out.
   the existing way.
 - **SC-004**: Migrating a document that names no sideloadable types takes exactly one edit to its
   declaration and zero edits to the code that reads or assembles it, with no behavioural change.
-- **SC-005**: 100% of sideloaded resources survive a parse-then-write round trip, whether or not
-  their type was declared.
+- **SC-005**: 100% of sideloaded resources whose type the declaration names survive a parse-then-write
+  round trip, and 100% of those it does not name are absent from the output — the drop is total and
+  predictable, never partial.
 - **SC-006**: A developer can declare their sideloadable types in one place, and no second
   declaration is needed for the same information anywhere else in the project.
 - **SC-007**: The number of resource types a single document may declare as sideloadable is not

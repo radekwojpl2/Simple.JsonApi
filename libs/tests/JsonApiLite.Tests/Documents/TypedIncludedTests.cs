@@ -9,8 +9,6 @@ public sealed record ContactIncluded : IIncluded
     public IReadOnlyList<Resource<CompanyAttributes, CompanyRelationships>>? Companies { get; init; }
 
     public IReadOnlyList<Resource<TagAttributes, TagRelationships>>? Tags { get; init; }
-
-    public IReadOnlyList<Resource> Undeclared { get; init; } = [];
 }
 
 public sealed record TagRelationships : IRelationships
@@ -23,8 +21,6 @@ public sealed record TagRelationships : IRelationships
 public sealed record ContactSelfIncluded : IIncluded
 {
     public IReadOnlyList<Resource<ContactAttributes, ContactRelationships>>? Contacts { get; init; }
-
-    public IReadOnlyList<Resource> Undeclared { get; init; } = [];
 }
 
 /// <summary>Sideloaded resources reached by member rather than by cast — the whole of this
@@ -59,7 +55,6 @@ public class TypedIncludedTests
 
         Assert.Equal("7", Assert.Single(document.Included!.Companies!).Id);
         Assert.Equal("3", Assert.Single(document.Included!.Tags!).Id);
-        Assert.Empty(document.Included!.Undeclared);
     }
 
     [Fact]
@@ -73,7 +68,6 @@ public class TypedIncludedTests
         Assert.Null(absent.Included);
         Assert.NotNull(empty.Included);
         Assert.Null(empty.Included!.Companies);
-        Assert.Empty(empty.Included!.Undeclared);
     }
 
     [Fact]
@@ -165,38 +159,55 @@ public class TypedIncludedTests
         Assert.Equal(JsonApiSerializer.Serialize(document), JsonApiSerializer.Serialize(reread));
     }
 
-    // ---- User Story 3: undeclared types ------------------------------------------------------
+    // ---- Undeclared types are dropped ---------------------------------------------------------
 
     [Fact]
-    public void An_undeclared_type_lands_in_Undeclared_rather_than_being_dropped()
+    public void A_type_no_member_declares_is_dropped()
     {
         var document = ReadDeclared(
             """{"data":{"type":"contacts","id":"1"},"included":[{"type":"companies","id":"7","attributes":{"name":"Acme"}},{"type":"deals","id":"4","attributes":{"title":"Q3"}}]}""")!;
 
+        // The declared type still arrives; the undeclared one is gone, with nowhere to look for it.
         Assert.Equal("Acme", document.Included?.Companies?[0].Attributes?.Name);
-        var deal = Assert.IsType<Resource<JsonObject>>(Assert.Single(document.Included!.Undeclared));
-        Assert.Equal("deals", deal.Type);
-        Assert.Equal("4", deal.Id);
+        Assert.Null(document.Included!.Tags);
     }
 
     [Fact]
-    public void An_undeclared_resource_survives_parse_then_write_unchanged()
+    public void A_dropped_resource_is_not_written_back()
     {
+        // The cost of dropping, stated as a test rather than left to be discovered: a document that
+        // is read and written again loses the resources its declaration did not name.
         const string json =
             """{"data":{"type":"contacts","id":"1"},"included":[{"type":"companies","id":"7","attributes":{"name":"Acme"}},{"type":"deals","id":"4","attributes":{"title":"Q3"}}]}""";
 
-        Assert.Equal(json, JsonApiSerializer.Serialize(ReadDeclared(json)!));
+        Assert.Equal(
+            """{"data":{"type":"contacts","id":"1"},"included":[{"type":"companies","id":"7","attributes":{"name":"Acme"}}]}""",
+            JsonApiSerializer.Serialize(ReadDeclared(json)!));
     }
 
     [Fact]
-    public void An_undeclared_type_is_not_an_error()
+    public void A_document_of_only_undeclared_types_reads_as_an_empty_shape()
     {
         var document = ReadDeclared(
             """{"data":{"type":"contacts","id":"1"},"included":[{"type":"widgets","id":"9"}]}""");
 
+        // Not an error — the member is present, every declared list simply stays unset.
         Assert.NotNull(document);
-        Assert.Null(document!.Included!.Companies);
-        Assert.Equal("widgets", Assert.Single(document.Included!.Undeclared).Type);
+        Assert.NotNull(document!.Included);
+        Assert.Null(document.Included!.Companies);
+        Assert.Null(document.Included!.Tags);
+    }
+
+    [Fact]
+    public void An_undeclared_type_is_kept_when_the_document_declares_nothing()
+    {
+        // The escape hatch still holds everything: dropping is a consequence of declaring, not of
+        // the sideload member itself.
+        var document = JsonApiSerializer
+            .Deserialize<ResourceDocument<ContactAttributes, ContactRelationships>>(
+                """{"data":{"type":"contacts","id":"1"},"included":[{"type":"deals","id":"4"}]}""")!;
+
+        Assert.Equal("deals", Assert.Single(document.Included!).Type);
     }
 
     [Fact]

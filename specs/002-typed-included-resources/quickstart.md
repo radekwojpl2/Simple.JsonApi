@@ -49,9 +49,6 @@ public sealed record ContactIncluded : IIncluded
 {
     public IReadOnlyList<Resource<CompanyAttributes, CompanyRelationships>>? Companies { get; init; }
     public IReadOnlyList<Resource<TagAttributes, TagRelationships>>? Tags { get; init; }
-
-    // Required by IIncluded: resources whose type no member above names.
-    public IReadOnlyList<Resource> Undeclared { get; init; } = [];
 }
 ```
 
@@ -81,9 +78,10 @@ means writing all four. `…, Meta, ContactIncluded>` is the common case. An ari
 "attributes, relationships, included" would collide with the existing "attributes, relationships,
 meta", so this is deliberate — see [research.md](research.md) D3.
 
-**A declared document has no untyped view.** Once you name a `TIncluded`, `document.Included` is your
-record, not a list. Reaching resources your declaration did not name is `document.Included.Undeclared`
-— that member exists on every implementation for exactly this reason.
+**A declared document has no untyped view, and a declaration is exhaustive.** Once you name a
+`TIncluded`, `document.Included` is your record, not a list — and a sideloaded resource whose type no
+member names is dropped on read and absent when the document is written back. There is nowhere to
+look for it. Declare every type you care about, or leave the document undeclared and keep them all.
 
 **The dictionary-relationships flavour cannot declare.** `ResourceDocument<TAttributes>` keeps the
 untyped form; the arity slot a typed version would need is already taken. If you need typed sideloads,

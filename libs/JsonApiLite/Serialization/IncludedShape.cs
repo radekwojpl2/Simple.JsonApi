@@ -39,10 +39,6 @@ internal sealed class IncludedShape
     private IncludedShape(Type includedType)
     {
         Type = includedType;
-        Undeclared = includedType.GetProperty(nameof(IIncluded.Undeclared),
-                         BindingFlags.Public | BindingFlags.Instance)
-                     ?? throw new InvalidOperationException(
-                         $"'{includedType}' must expose an '{nameof(IIncluded.Undeclared)}' member.");
 
         // Declaration order is fixed here, at construction, so the write path is deterministic. The
         // specification imposes no ordering within 'included', so the order itself is a free choice;
@@ -56,7 +52,7 @@ internal sealed class IncludedShape
         Array.Sort(properties, static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
         foreach (var property in properties)
         {
-            if (property == Undeclared || DeclaredElementOf(property) is not { } elementType)
+            if (DeclaredElementOf(property) is not { } elementType)
             {
                 continue;
             }
@@ -84,8 +80,6 @@ internal sealed class IncludedShape
     /// <summary>The declared members, in the order they appear on the type.</summary>
     public IReadOnlyList<IncludedMember> Members { get; }
 
-    public PropertyInfo Undeclared { get; }
-
     public bool TryResolve(string resourceType, out IncludedMember member) =>
         _byResourceType.TryGetValue(resourceType, out member!);
 
@@ -102,12 +96,19 @@ internal sealed class IncludedShape
             }
         }
 
-        return value.Undeclared.Count == 0;
+        // AnyIncluded declares no members and is itself the collection, so the loop above can never
+        // see its contents.
+        if (value is IReadOnlyCollection<Resource> { Count: > 0 })
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>The concrete resource type a member holds, or null when the member is not a
-    /// declaration — <c>Undeclared</c> is <c>IReadOnlyList&lt;Resource&gt;</c> over the abstract
-    /// base, which is not a closed generic resource and so never matches.</summary>
+    /// declaration — an indexer or a count is not a closed generic resource list and so never
+    /// matches.</summary>
     private static Type? DeclaredElementOf(PropertyInfo property)
     {
         if (!property.CanRead || !property.PropertyType.IsGenericType ||

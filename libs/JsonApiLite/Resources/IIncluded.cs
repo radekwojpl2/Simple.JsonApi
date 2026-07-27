@@ -6,14 +6,12 @@ namespace JsonApiLite;
 /// (https://jsonapi.org/format/#document-compound-documents), exactly as
 /// <see cref="IRelationships"/> sits over a name-keyed object — so reaching a sideloaded resource
 /// is member access rather than a cast.</summary>
-/// <remarks>The wire type name is never written here as a string: each member's element type
-/// declares it through <see cref="IResourceType"/>, so the name exists once and a typo is a
-/// compile error.</remarks>
-public interface IIncluded
-{
-    /// <summary>Sideloaded resources whose type no declared member names. A declared document
-    /// offers no untyped view of its sideload member, so this is the only route to a resource the
-    /// declaration did not anticipate — without it such a resource would be silently dropped on a
-    /// round trip. Empty rather than null when everything resolved.</summary>
-    IReadOnlyList<Resource> Undeclared { get; }
-}
+/// <remarks>Empty on purpose, like <see cref="IAttributes"/> and <see cref="IRelationships"/>: it
+/// states intent and keeps unrelated types out of the sideload position. The wire type name is
+/// never written here as a string either — each member's element type declares it through
+/// <see cref="IResourceType"/>, so the name exists once and a typo is a compile error.
+/// <para>A resource whose type no member names is dropped when the document is read: a declaration
+/// states what the document may carry, and the reader asked for nothing else. A document that
+/// cannot enumerate its sideloadable types keeps the untyped <see cref="AnyIncluded"/> instead,
+/// which holds every resource that arrives.</para></remarks>
+public interface IIncluded;

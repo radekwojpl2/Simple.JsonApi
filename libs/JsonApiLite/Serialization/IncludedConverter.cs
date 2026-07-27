@@ -41,7 +41,10 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
 
         var shape = IncludedShape.For(typeof(TIncluded));
         var declared = new Dictionary<string, IList>(StringComparer.Ordinal);
-        var undeclared = new List<Resource>();
+
+        // AnyIncluded declares nothing and holds everything, so it is the only shape that keeps a
+        // resource no member claimed. A declared shape has nowhere to put one and drops it.
+        var untyped = typeof(TIncluded) == typeof(AnyIncluded) ? new List<Resource>() : null;
 
         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
@@ -53,16 +56,23 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
                 continue;
             }
 
-            // No declared member names this type, so it reads back the way an undeclared document's
-            // resources always have — through ResourceConverter, as Resource<JsonObject> or the
-            // registered concrete type.
-            if (element.Deserialize<Resource>(options) is { } untyped)
+            if (untyped is null)
             {
-                undeclared.Add(untyped);
+                // Dropped on purpose: a declaration states the resource types the document may
+                // carry, so one it does not name was not asked for. The resource is not re-emitted
+                // when the document is written back.
+                continue;
+            }
+
+            // Reads back the way an undeclared document's resources always have — through
+            // ResourceConverter, as Resource<JsonObject> or the registered concrete type.
+            if (element.Deserialize<Resource>(options) is { } kept)
+            {
+                untyped.Add(kept);
             }
         }
 
-        return Build(shape, declared, undeclared);
+        return Build(shape, declared, untyped);
     }
 
     public override void Write(Utf8JsonWriter writer, TIncluded value, JsonSerializerOptions options)
@@ -70,8 +80,8 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
         var shape = IncludedShape.For(typeof(TIncluded));
         writer.WriteStartArray();
 
-        // Declaration order, then whatever the declaration did not name. The specification imposes
-        // no ordering within 'included'; this order is fixed only so output stays comparable.
+        // Declaration order. The specification imposes no ordering within 'included'; this order is
+        // fixed only so output stays comparable.
         foreach (var member in shape.Members)
         {
             if (member.Property.GetValue(value) is not IEnumerable resources)
@@ -85,9 +95,13 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
             }
         }
 
-        foreach (var resource in value.Undeclared)
+        // AnyIncluded declares no members, so its resources are reached as the collection it is.
+        if (value is IEnumerable<Resource> untyped)
         {
-            JsonSerializer.Serialize(writer, resource, resource.GetType(), options);
+            foreach (var resource in untyped)
+            {
+                JsonSerializer.Serialize(writer, resource, resource.GetType(), options);
+            }
         }
 
         writer.WriteEndArray();
@@ -119,11 +133,11 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
     // init-only setters are a compile-time restriction, not a runtime one, so the declared record is
     // built the same way any object initializer would build it.
     private static TIncluded Build(
-        IncludedShape shape, Dictionary<string, IList> declared, List<Resource> undeclared)
+        IncludedShape shape, Dictionary<string, IList> declared, List<Resource>? untyped)
     {
-        if (typeof(TIncluded) == typeof(AnyIncluded))
+        if (untyped is not null)
         {
-            return (TIncluded)(object)new AnyIncluded(undeclared);
+            return (TIncluded)(object)new AnyIncluded(untyped);
         }
 
         var included = (TIncluded)Activator.CreateInstance(typeof(TIncluded))!;
@@ -135,7 +149,6 @@ internal sealed class IncludedConverter<TIncluded> : JsonConverter<TIncluded>
             }
         }
 
-        shape.Undeclared.SetValue(included, undeclared);
         return included;
     }
 }
