@@ -270,6 +270,41 @@ array, linkage endpoints get identifiers, and `Optional<T>` attributes are docum
 the explicit null a PATCH uses to clear a member. Member names and enum representation are read
 from the serializer options, so pass yours to `UseJsonApiBodies` if the app configured its own.
 
+### The document envelope
+
+Response schemas describe `links`, `meta` and `included` alongside `data`, all from the type
+arguments the endpoint already names — there is no second annotation to write. Nothing is marked
+required, because every envelope member is optional on the wire.
+
+```csharp
+.ProducesJsonApi<ResourceCollectionDocument<ContactAttributes, ContactRelationships, PageMeta>>();
+```
+
+```jsonc
+{
+  "data":  [ /* ... */ ],
+  "meta":  { "total": { "type": "integer" }, "pageCount": { "type": "integer" } },
+  "links": { "self": …, "first": …, "prev": …, "next": …, "last": … }
+}
+```
+
+- **`meta`** is walked from the declared shape. Leave the parameter as `Meta` and it is described as
+  an object with unconstrained members — the specification reserves no meta member names, so a
+  document that declares no shape may still carry any.
+- **`links`** varies by document kind rather than being uniform: `self` everywhere, the pagination
+  links only where the primary data is a collection, `related` only on linkage documents. Each is
+  either a URI string or `{href, meta}`. `describedby` is not described, because `Links` has no such
+  member and so no endpoint can send one.
+- **`included`** is constrained to the types the document's sideload shape declares, as one flat
+  array — the per-type members are a reading convenience in C#, not a wire shape. A document that
+  declares none gets an unconstrained resource array.
+
+Request body schemas are unchanged: a request is the caller's document, so it has no links to follow
+and nothing sideloaded, even when its type carries declared shapes for them.
+
+`IncludedDeclaration.Of(typeof(ContactIncluded))` reports the same declaration the schema is built
+from, for tooling of your own.
+
 ## Also in the box
 
 - `Resource<TAttributes>` — relationships keyed by name, the escape hatch when they are not known
