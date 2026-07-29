@@ -21,6 +21,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The schema builder and the document-type reader are internal, and describing a document is
+         the whole product here, so the tests have to reach them. Note this is not the same call as
+         the one rejected for the core package: that would have been a friend assembly across a
+         published package boundary, where a consumer pairing mismatched versions fails at runtime.
+         This is a test project in this repository, built from the same source in the same solution. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>JsonApiLite.OpenApi.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
 
     <!-- Microsoft.OpenApi is pinned above the version Microsoft.AspNetCore.OpenApi drags in

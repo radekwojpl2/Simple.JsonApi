@@ -30,25 +30,29 @@ which only ASP.NET Core's built-in generator runs — so the document has to com
 `AddOpenApi()`. Swashbuckle and Scalar are fine as *readers* of that document; what does not work
 is a different *generator*. That is the next item.
 
-## Next
+## Done
 
-**`links`, `meta` and `included` in document schemas.** `Simple.JsonApi.OpenApi` describes `data`
-and `errors` and stops there. A collection endpoint that declares a `TMeta` gets no schema for it,
-and pagination links are undocumented — the two things a list endpoint most needs to communicate.
-The document envelope is the missing piece, not the resource inside it.
+**`links`, `meta` and `included` in document schemas.** Response schemas now describe all three: a
+declared `TMeta` is walked into named, typed members; the link members are described per document
+kind, with pagination only where the primary data is a collection; and `included` is constrained to
+the resource types the document declares. Request schemas are unchanged. Reported as
+[#8](https://github.com/radekwojpl2/Simple.JsonApi/issues/8).
 
-**A typed `included`.** The wire model's sideload member is the one place the library still hands
-back an untyped value: `IReadOnlyList<Resource>`, which reads back as `Resource<JsonObject>` unless
-a `ResourceTypeRegistry` is supplied, so getting at a sideloaded resource's attributes means naming
-its concrete type at every read site. Declaring the types a document may sideload — one member per
-type, as `IRelationships` already does for relationships — makes that member access instead, and
-the declaration doubles as the input the OpenAPI package needs to describe `included` (above).
-Reported as [#9](https://github.com/radekwojpl2/Simple.JsonApi/issues/9).
+`describedby` is deliberately not described. The specification defines it for a document, but `Links`
+has no such member, so no endpoint built on this library can send one — and describing a member that
+can never appear is a claim nothing would falsify, since every link member is optional.
 
-The cost is a breaking change: `Included` changes type on all four resource document forms. It is
-narrow — collection-expression literals, indexing, `OfType`, `foreach` and `null` all keep
-compiling; only assigning a pre-existing collection *variable* breaks, and every break is a compile
+**A typed `included`.** Declaring the types a document may sideload — one member per type, as
+`IRelationships` already does for relationships — made the sideload member reachable by member
+instead of by cast, and the declaration doubles as the input the OpenAPI package reads to describe
+`included`. Reported as [#9](https://github.com/radekwojpl2/Simple.JsonApi/issues/9).
+
+The cost was a breaking change: `Included` changed type on all four resource document forms. It was
+narrow — collection-expression literals, indexing, `OfType`, `foreach` and `null` all kept
+compiling; only assigning a pre-existing collection *variable* broke, and every break was a compile
 error with a one-token fix.
+
+## Next
 
 **Schemas under Swashbuckle and NSwag.** An app whose document comes from Swashbuckle's
 `SwaggerGen` or from NSwag gets the operations but not the bodies, because neither runs the

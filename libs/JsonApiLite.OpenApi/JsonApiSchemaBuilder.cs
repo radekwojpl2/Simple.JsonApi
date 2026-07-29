@@ -16,46 +16,142 @@ internal sealed class JsonApiSchemaBuilder(JsonSerializerOptions serializerOptio
     {
         if (body.Shape == JsonApiShape.Errors)
         {
-            return ErrorDocument();
+            return ErrorDocument(body);
         }
 
         // Linkage documents put resource identifiers under data; resource documents put a full
         // resource object there. Either way a collection wraps that in an array.
         IOpenApiSchema data = body.Shape == JsonApiShape.Linkage
             ? Identifier(nullable: !body.Collection)
-            : Resource(body);
+            : Resource(body.ResourceType!, body.Attributes!, body.Relationships, body.IncludeId);
         if (body.Collection)
         {
             data = new OpenApiSchema { Type = JsonSchemaType.Array, Items = data };
         }
 
-        return Object(new() { ["data"] = data }, ["data"]);
+        var properties = new Dictionary<string, IOpenApiSchema> { ["data"] = data };
+        Envelope(body, properties);
+
+        // Only data is required. Every envelope member is optional on the wire, so requiring one
+        // would make a response the library itself produces fail validation.
+        return Object(properties, ["data"]);
     }
 
-    private OpenApiSchema Resource(JsonApiBody body)
+    /// <summary>Adds the envelope members — <c>links</c>, <c>meta</c> and, where the primary data is
+    /// resources, <c>included</c>.</summary>
+    /// <remarks>Responses only. A request body is the caller's document: it has no links to follow,
+    /// nothing sideloaded, and no server-computed metadata, so describing those members would tell a
+    /// client to send what it must not — even when the document type carries a declared shape for
+    /// them.</remarks>
+    private void Envelope(JsonApiBody body, Dictionary<string, IOpenApiSchema> properties)
+    {
+        if (body is not JsonApiResponseBody)
+        {
+            return;
+        }
+
+        properties["links"] = Links(body.Shape, body.Collection);
+        properties["meta"] = Meta(body.Meta);
+
+        // The sideload member holds "resource objects that are related to the primary data", so it
+        // does not apply to a document whose primary data is linkage or which has none at all.
+        if (body.Shape == JsonApiShape.Resource)
+        {
+            properties["included"] = Included(body.Included);
+        }
+    }
+
+    /// <summary>The declared metadata shape walked into named, typed members, or an unconstrained
+    /// object when the document declared none.</summary>
+    /// <remarks>Unconstrained rather than omitted: the specification reserves no meta member names, so
+    /// a document that declares no shape may still carry any members, and omitting the member would
+    /// tell a caller it does not exist.</remarks>
+    private OpenApiSchema Meta(Type? declared)
+    {
+        if (declared is null)
+        {
+            return new OpenApiSchema { Type = JsonSchemaType.Object };
+        }
+
+        return Schema(declared, []);
+    }
+
+    /// <summary>The sideload member: one flat array, as the specification requires, whose entries are
+    /// constrained to the declared resource types when the document named any.</summary>
+    private OpenApiSchema Included(Type? declared)
+    {
+        var entries = new List<IOpenApiSchema>();
+        if (declared is not null)
+        {
+            foreach (var (resourceType, elementType) in IncludedDeclaration.Of(declared))
+            {
+                entries.Add(SideloadedResource(resourceType, elementType));
+            }
+        }
+
+        // A declaration naming nothing carries no more information than declaring nothing at all, so
+        // both describe an unconstrained resource object rather than a list that can hold nothing.
+        if (entries.Count == 0)
+        {
+            return new OpenApiSchema
+            {
+                Type = JsonSchemaType.Array,
+                Items = new OpenApiSchema { Type = JsonSchemaType.Object },
+            };
+        }
+
+        return new OpenApiSchema
+        {
+            Type = JsonSchemaType.Array,
+            Items = new OpenApiSchema { AnyOf = entries },
+        };
+    }
+
+    /// <summary>One declared sideloadable type, described as the full resource object it is — the
+    /// declared element type is <c>Resource&lt;TAttributes, TRelationships&gt;</c>, so its two type
+    /// arguments are exactly what the resource builder already needs.</summary>
+    /// <remarks>Always with an id: only a resource originating at the client may omit one, and nothing
+    /// arriving in a response's sideload member did.</remarks>
+    private OpenApiSchema SideloadedResource(string resourceType, Type elementType)
+    {
+        var arguments = elementType.GetGenericArguments();
+        Type? relationships = null;
+        if (arguments.Length >= 2)
+        {
+            relationships = arguments[1];
+        }
+
+        return Resource(resourceType, arguments[0], relationships, includeId: true);
+    }
+
+    /// <summary>A resource object, described from its resource type name and the types of its two
+    /// halves. Takes those facts rather than a document, because a sideloaded resource needs the same
+    /// description and is not a document.</summary>
+    private OpenApiSchema Resource(
+        string resourceType, Type attributesType, Type? relationshipsType, bool includeId)
     {
         var properties = new Dictionary<string, IOpenApiSchema>
         {
             // A resource object always names its type; here it can only be this one value.
-            ["type"] = new OpenApiSchema { Type = JsonSchemaType.String, Const = body.ResourceType },
+            ["type"] = new OpenApiSchema { Type = JsonSchemaType.String, Const = resourceType },
         };
         var required = new List<string> { "type" };
 
-        if (body.IncludeId)
+        if (includeId)
         {
             properties["id"] = new OpenApiSchema { Type = JsonSchemaType.String };
             required.Add("id");
         }
 
-        var attributes = Attributes(body.Attributes!);
+        var attributes = Attributes(attributesType);
         if (attributes.Properties?.Count > 0)
         {
             properties["attributes"] = attributes;
         }
 
-        if (body.Relationships is not null)
+        if (relationshipsType is not null)
         {
-            var relationships = Relationships(body.Relationships);
+            var relationships = Relationships(relationshipsType);
             if (relationships.Properties?.Count > 0)
             {
                 properties["relationships"] = relationships;
@@ -132,9 +228,58 @@ internal sealed class JsonApiSchemaBuilder(JsonSerializerOptions serializerOptio
         };
     }
 
+    /// <summary>The document link members for one document kind.</summary>
+    /// <remarks>Written out rather than reflected, for the same reason the error document is: the
+    /// <c>Links</c> and <c>Link</c> types carry converters of their own, so walking their CLR shape
+    /// would describe fields instead of the wire.
+    /// <para>The set varies by kind rather than being uniform. Pagination appears only where the
+    /// primary data is a collection ("Pagination links MUST appear in the links object that
+    /// corresponds to a collection"), and <c>related</c> only on linkage ("related: a related resource
+    /// link when primary data represents a relationship").</para>
+    /// <para>There is deliberately no <c>describedby</c>. The specification defines it for a document,
+    /// but the library's links object has no such member, so no endpoint built on this can send one —
+    /// and describing a member that can never appear is a claim nothing would falsify, because every
+    /// link member is optional.</para></remarks>
+    private static OpenApiSchema Links(JsonApiShape shape, bool collection)
+    {
+        var properties = new Dictionary<string, IOpenApiSchema> { ["self"] = Link() };
+
+        if (shape == JsonApiShape.Linkage)
+        {
+            properties["related"] = Link();
+        }
+
+        if (collection)
+        {
+            properties["first"] = Link();
+            properties["prev"] = Link();
+            properties["next"] = Link();
+            properties["last"] = Link();
+        }
+
+        return Object(properties, []);
+    }
+
+    // A bare URI when the link carries nothing else, a link object when it carries meta.
+    private static OpenApiSchema Link() =>
+        new()
+        {
+            AnyOf =
+            [
+                new OpenApiSchema { Type = JsonSchemaType.String, Format = "uri" },
+                Object(
+                    new()
+                    {
+                        ["href"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uri" },
+                        ["meta"] = new OpenApiSchema { Type = JsonSchemaType.Object },
+                    },
+                    ["href"]),
+            ],
+        };
+
     // Written out rather than reflected: Links and Meta carry converters of their own, so walking
     // the CLR shape of Error would describe the fields instead of the wire.
-    private static OpenApiSchema ErrorDocument()
+    private OpenApiSchema ErrorDocument(JsonApiBody body)
     {
         var source = Object(
             new()
@@ -157,9 +302,16 @@ internal sealed class JsonApiSchemaBuilder(JsonSerializerOptions serializerOptio
             },
             []);
 
-        return Object(
-            new() { ["errors"] = new OpenApiSchema { Type = JsonSchemaType.Array, Items = error } },
-            ["errors"]);
+        // Through the same seam as every other kind, so an error response's envelope cannot drift
+        // from a data response's. Its metadata is unconstrained by necessity rather than by choice:
+        // ErrorDocument is non-generic, so an author has no way to declare a shape for it.
+        var properties = new Dictionary<string, IOpenApiSchema>
+        {
+            ["errors"] = new OpenApiSchema { Type = JsonSchemaType.Array, Items = error },
+        };
+        Envelope(body, properties);
+
+        return Object(properties, ["errors"]);
     }
 
     /// <summary>An attribute value's schema. Unwraps the carriers that only mean "may be absent",
