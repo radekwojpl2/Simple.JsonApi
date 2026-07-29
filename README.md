@@ -155,8 +155,33 @@ company.Meta!.Members["role"];     // or by name, for meta you have no type for
 
 ## Compound documents
 
-`included` is heterogeneous, so it reads back as `Resource<JsonObject>` unless you register the
-types:
+`included` is heterogeneous. Declare the types a document may sideload and each gets its own
+member, so reading one is member access rather than a cast:
+
+```csharp
+public sealed record ContactIncluded : IIncluded
+{
+    public IReadOnlyList<Resource<CompanyAttributes, CompanyRelationships>>? Companies { get; init; }
+    public IReadOnlyList<Resource<TagAttributes, TagRelationships>>? Tags { get; init; }
+}
+
+var document = JsonApiSerializer
+    .Deserialize<ResourceDocument<ContactAttributes, ContactRelationships, Meta, ContactIncluded>>(json)!;
+
+string? company = document.Included?.Companies?[0].Attributes?.Name;
+```
+
+The type name is never written as a string — it comes from `CompanyAttributes.ResourceType`, so a
+typo is a compile error. A declared document needs no `ResourceTypeRegistry`: its members already
+say which types to expect. `included` stays one flat array on the wire, as the specification
+requires.
+
+A declaration is exhaustive: a sideloaded resource whose type no member names is **dropped** when
+the document is read, and is not written back. Declare every type you care about, or leave the
+document undeclared and keep them all.
+
+Declaring is optional. Without it, `Included` is an `AnyIncluded` — still an
+`IReadOnlyList<Resource>`, reading back as `Resource<JsonObject>` unless you register the types:
 
 ```csharp
 var options = JsonApiSerializer.CreateOptions(
@@ -167,6 +192,23 @@ var document = JsonApiSerializer
 
 var company = (Resource<CompanyAttributes, CompanyRelationships>)document.Included![0];
 ```
+
+### Migrating across the `Included` change
+
+`Included` moved from `IReadOnlyList<Resource>?` to `AnyIncluded?`. Because `AnyIncluded` *is* an
+`IReadOnlyList<Resource>` and carries `[CollectionBuilder]`, almost everything still compiles:
+indexing, `foreach`, `OfType<T>()`, `null`, assignment *to* an `IReadOnlyList<Resource>`, and the
+collection-expression literal `Included = [company, tag]`.
+
+One form breaks — assigning a collection you already hold in a variable:
+
+```csharp
+Included = extras,                    // CS0266 / CS0029
+Included = [.. extras],               // fix, or
+Included = new AnyIncluded(extras),   // where the copy is unwanted
+```
+
+Every break is a compile error; none is a silent behaviour change.
 
 ## Relationship endpoints
 

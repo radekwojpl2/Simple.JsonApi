@@ -120,3 +120,9 @@ verify a schema change; do not assume a schema is right because it compiles.
   decision or record a constraint. A comment restating the code is worse than none.
 - **Public API carries XML docs**, and they say what the member is for, not what its name already
   says.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan:
+[specs/002-typed-included-resources/plan.md](specs/002-typed-included-resources/plan.md)
+<!-- SPECKIT END -->

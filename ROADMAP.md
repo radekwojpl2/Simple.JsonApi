@@ -37,6 +37,19 @@ and `errors` and stops there. A collection endpoint that declares a `TMeta` gets
 and pagination links are undocumented — the two things a list endpoint most needs to communicate.
 The document envelope is the missing piece, not the resource inside it.
 
+**A typed `included`.** The wire model's sideload member is the one place the library still hands
+back an untyped value: `IReadOnlyList<Resource>`, which reads back as `Resource<JsonObject>` unless
+a `ResourceTypeRegistry` is supplied, so getting at a sideloaded resource's attributes means naming
+its concrete type at every read site. Declaring the types a document may sideload — one member per
+type, as `IRelationships` already does for relationships — makes that member access instead, and
+the declaration doubles as the input the OpenAPI package needs to describe `included` (above).
+Reported as [#9](https://github.com/radekwojpl2/Simple.JsonApi/issues/9).
+
+The cost is a breaking change: `Included` changes type on all four resource document forms. It is
+narrow — collection-expression literals, indexing, `OfType`, `foreach` and `null` all keep
+compiling; only assigning a pre-existing collection *variable* breaks, and every break is a compile
+error with a one-token fix.
+
 **Schemas under Swashbuckle and NSwag.** An app whose document comes from Swashbuckle's
 `SwaggerGen` or from NSwag gets the operations but not the bodies, because neither runs the
 transformer — which is also what stands between the library and `FastEndpoints.Swagger`. The likely
