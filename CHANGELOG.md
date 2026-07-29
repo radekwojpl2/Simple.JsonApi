@@ -1,3 +1,43 @@
+# [2.0.0](https://github.com/radekwojpl2/Simple.JsonApi/compare/v1.1.0...v2.0.0) (2026-07-29)
+
+
+* feat!: drop sideloaded resources whose type no member declares ([ddbb34b](https://github.com/radekwojpl2/Simple.JsonApi/commit/ddbb34bf5eadb00924434ddf4439fb4470dfd3ca))
+
+
+### Features
+
+* declare the resource types a document may sideload ([38e3b3c](https://github.com/radekwojpl2/Simple.JsonApi/commit/38e3b3cc912d2f5f2e5e8a420aecec3c69472dbd))
+* declare the resource types a document may sideload ([2a2d598](https://github.com/radekwojpl2/Simple.JsonApi/commit/2a2d598507e661eba86a2fecf9178644c854ca41))
+
+
+### BREAKING CHANGES
+
+* `IIncluded.Undeclared` is removed. An `IIncluded`
+implementation no longer declares it, and a sideloaded resource whose type no
+member names is dropped on read rather than preserved. Delete the
+`Undeclared` member from any declared sideload shape; there is no replacement,
+and no way to reach a resource the declaration does not name.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+* `Included` changes type from `IReadOnlyList<Resource>?` to
+`TIncluded?` (defaulting to `AnyIncluded`) on `ResourceDocument<,>`,
+`ResourceDocument<,,>`, `ResourceCollectionDocument<,>` and
+`ResourceCollectionDocument<,,>`. Because `AnyIncluded` implements
+`IReadOnlyList<Resource>` and carries `[CollectionBuilder]`, indexing,
+`foreach`, `OfType<T>()`, `null`, assignment to an `IReadOnlyList<Resource>`
+and the literal `Included = [company, tag]` all keep compiling. One form
+breaks — assigning a collection held in a variable:
+
+    Included = extras,                    // CS0266 / CS0029
+    Included = [.. extras],               // fix, or
+    Included = new AnyIncluded(extras),   // where the copy is unwanted
+
+Every break is a compile error; none is a silent behaviour change. The
+single-argument forms `ResourceDocument<TAttributes>` and
+`ResourceCollectionDocument<TAttributes>` are unchanged.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
 # [1.1.0](https://github.com/radekwojpl2/Simple.JsonApi/compare/v1.0.0...v1.1.0) (2026-07-27)
 
 
