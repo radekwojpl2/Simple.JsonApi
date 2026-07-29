@@ -2,8 +2,33 @@
 
 **Feature Branch**: `001-document-envelope-schemas`
 **Created**: 2026-07-27
-**Status**: Draft
+**Status**: **Superseded by [`003-openapi-envelope-schemas`](../003-openapi-envelope-schemas/spec.md)** (2026-07-29)
 **Input**: User description: "Read this for specification https://github.com/radekwojpl2/Simple.JsonApi/issues/8"
+
+> ## Superseded — do not plan or implement from this document
+>
+> This specification covers https://github.com/radekwojpl2/Simple.JsonApi/issues/8 and was written on
+> 2026-07-27, before `002-typed-included-resources` existed. Two things have since made it wrong
+> rather than merely incomplete:
+>
+> 1. **FR-016 forbids what the feature now requires.** It states "This feature MUST NOT require a
+>    change to the core wire-model package". Its Story 3 was written when no declaration of
+>    sideloadable types existed; `002` then added one, and the map from a wire type name to its
+>    declared member is internal to the core package
+>    (`libs/JsonApiLite/Serialization/IncludedShape.cs:30`). Describing the sideload member now
+>    requires exposing it. `002`'s own Dependencies section anticipated this, recording that the two
+>    specifications "must be reconciled rather than left contradicting each other".
+> 2. **It does not know the description generator is broken.** `002` shipped the four-argument
+>    document form and the sample adopted it; the annotation rejects it and the sample no longer
+>    starts. That outranks all three of this document's stories and is `003`'s P1.
+>
+> `003` also drops `describedby` from the link members, which this document requires at FR-005 and
+> FR-019: `libs/JsonApiLite/Documents/Links.cs:7-16` has no such member, so no endpoint built on
+> this library can send one.
+>
+> Kept rather than deleted because `003` inherits four of its clarifications — responses only,
+> error-document envelope members, per-kind link sets, and Story 3 being in scope — and the record of
+> when and why those were decided lives here.
 
 ## User Scenarios & Testing *(mandatory)*
 

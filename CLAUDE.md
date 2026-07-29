@@ -124,5 +124,5 @@ verify a schema change; do not assume a schema is right because it compiles.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-[specs/002-typed-included-resources/plan.md](specs/002-typed-included-resources/plan.md)
+[specs/003-openapi-envelope-schemas/plan.md](specs/003-openapi-envelope-schemas/plan.md)
 <!-- SPECKIT END -->

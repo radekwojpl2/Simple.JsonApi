@@ -2,7 +2,12 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-27
+**Status**: **Superseded by [`003-openapi-envelope-schemas`](../../003-openapi-envelope-schemas/spec.md)** (2026-07-29)
 **Feature**: [spec.md](../spec.md)
+
+> This checklist validates a superseded specification and is retained only as a record. The live
+> checklist for this issue is
+> [`003-openapi-envelope-schemas/checklists/requirements.md`](../../003-openapi-envelope-schemas/checklists/requirements.md).
 
 ## Content Quality
 

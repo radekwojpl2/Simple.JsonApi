@@ -92,7 +92,7 @@ each with its type. Verifiable without any link or sideload member being describ
 ### User Story 3 - A paged list endpoint is visibly paged (Priority: P3)
 
 The envelope's link members — the ones saying where this page is, where the first, previous, next and
-last pages are, and where the endpoint is documented — are absent from the description. A consumer
+last pages are, and what a relationship points at — are absent from the description. A consumer
 cannot tell that a paged endpoint pages, and a generated client has no member to follow. This story
 describes the link members on the document kinds that can carry them.
 
@@ -178,6 +178,29 @@ not of Story 1.
   permit unstated members rather than reject them, as it does today.
 - **A document form the generator does not understand.** Widening what is accepted must not turn a
   genuinely unsupported type into a silently empty schema; it must still fail loudly.
+- **A link member the specification defines but the library cannot send.** The description must
+  describe what an endpoint can actually produce, not everything the specification permits.
+
+## Clarifications
+
+### Session 2026-07-29
+
+- Q: Should the description describe `describedby`, which the JSON:API specification defines as a
+  document link member? → A: No — drop it. The library's links object has no such member
+  (`libs/JsonApiLite/Documents/Links.cs:7-16` declares `Self`, `Related`, `About`, `First`, `Prev`,
+  `Next`, `Last`), so no endpoint built on it can send one. FR-008 and FR-021 were written the
+  opposite way — inherited from the superseded `001-document-envelope-schemas`, whose author had not
+  checked the type — and are revised above, with FR-008a added to state the rule generally.
+  - **Why this is the right way round**: describing a member the library cannot produce is a lie the
+    tests cannot catch. Every envelope member is optional, so an absent `describedby` never fails
+    validation — SC-005 would pass with the description claiming a member that can never appear.
+  - **Rejected alternative**: adding a `DescribedBy` member to the core links object. That is a
+    wire-model change, which FR-023 confines to making the sideload declaration legible, and it would
+    have added surface to the zero-dependency package to satisfy a description requirement rather
+    than a consumer's need. If an endpoint author later wants to send `describedby`, that is a
+    separate feature against the wire model, and the description follows it rather than leading it.
+  - **Accepted cost**: a consumer cannot discover a description document link from the published
+    description. Nothing in the project sends one today, so the cost is currently zero.
 
 ## Requirements *(mandatory)*
 
@@ -210,14 +233,18 @@ not of Story 1.
 
 **Links (Story 3)**
 
-- **FR-008**: The published description MUST describe the document link members defined by the
-  JSON:API specification, and the set MUST vary by document kind rather than being uniform:
-  - `self` and `describedby` on every document kind.
+- **FR-008**: The published description MUST describe the document link members the library can
+  actually send, and the set MUST vary by document kind rather than being uniform:
+  - `self` on every document kind.
   - The pagination links (`first`, `last`, `prev`, `next`) only on documents whose primary data is a
     collection — a resource collection or to-many linkage. [Spec: "Pagination links **MUST** appear in
     the links object that corresponds to a collection."]
   - `related` only on linkage documents, whose primary data represents a resource relationship.
     [Spec: "**related**: a related resource link when primary data represents a relationship."]
+- **FR-008a**: The description MUST NOT describe a link member the library cannot produce. In
+  particular `describedby`, which the JSON:API specification defines for a document, MUST NOT be
+  described, because the library's links object has no such member. [Revised 2026-07-29 — FR-008 and
+  FR-021 previously required `describedby`. See Clarifications.]
 - **FR-009**: Each link member MUST be described as accepting either a plain URL or an object carrying
   a URL and its own metadata, matching what the library can send. [Spec: a link is "a string whose
   value is a URI-reference pointing to the link's target, a link object or `null` if the link does
@@ -254,10 +281,11 @@ not of Story 1.
 - **FR-020**: The envelope members MUST be described on response schemas only. A request body schema
   MUST be unchanged — no metadata member, no link members, no sideload member — even when the
   request's document type carries a declared metadata shape.
-- **FR-021**: An error document's response schema MUST describe a `links` member carrying `self` and
-  `describedby`, and a metadata member described as an unconstrained object. It MUST NOT describe
-  pagination links, `related`, or a sideload member. The metadata is unconstrained because the error
-  document form is non-generic, so an author has no way to declare a shape for it.
+- **FR-021**: An error document's response schema MUST describe a `links` member carrying `self`, and
+  a metadata member described as an unconstrained object. It MUST NOT describe pagination links,
+  `related`, or a sideload member. The metadata is unconstrained because the error document form is
+  non-generic, so an author has no way to declare a shape for it. [Revised 2026-07-29 — this
+  requirement previously also demanded `describedby`. See FR-008a and Clarifications.]
 - **FR-022**: The sideload member MUST be described only on documents whose primary data is one or
   more resources. Linkage and error documents MUST NOT describe it. [Spec: the `included` member
   "only appears when the document contains a top-level `data` key"; those documents have no resource

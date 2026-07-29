@@ -40,16 +40,23 @@
   guess — unfalsifiable. The items are marked passing on the basis that the *normative* content is
   free of implementation detail.
 
-- **Zero clarification markers were needed.** Four questions the originating issue leaves open were
-  resolved from existing project decisions rather than asked:
+- **Zero clarification markers were needed at drafting.** Four questions the originating issue
+  leaves open were resolved from existing project decisions rather than asked:
   - Request bodies vs. responses only → responses only (`001` Clarifications, 2026-07-27).
-  - Whether error documents gain envelope members → yes, `self`/`describedby` plus unconstrained
-    metadata (`001` Clarifications, 2026-07-27).
+  - Whether error documents gain envelope members → yes, `links` plus an unconstrained metadata
+    member (`001` Clarifications, 2026-07-27; the link set was narrowed on 2026-07-29, below).
   - Which link members appear on which document kinds → per-kind sets (`001` Clarifications,
     2026-07-27).
   - Whether the core wire-model package may change → confined change permitted, because `002`
     FR-019 already commits the declaration to being readable by this tooling, and the map it would
     read is presently internal.
+
+- **One clarification was added after planning (session 2026-07-29).** Reading
+  `libs/JsonApiLite/Documents/Links.cs:7-16` during Phase 0 showed the library has no `DescribedBy`
+  member, so FR-008 and FR-021 — both inherited from `001` — required describing something no
+  endpoint can send. The spec now drops `describedby` and adds **FR-008a** as the general rule. The
+  checklist items above were re-validated after that edit and still pass: the revised requirements
+  remain testable, and FR-008a is verifiable by searching the emitted document for the member.
 
 - **One item that planning must settle, not the spec.** FR-014 requires the declared types be read
   from the author's existing declaration, and FR-023 bounds what may change in the core package to
